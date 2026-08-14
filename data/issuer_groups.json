@@ -1,0 +1,235 @@
+{
+  "threshold": 0.95,
+  "min_overlap_sessions": 120,
+  "built_from": "data/bars/daily.parquet",
+  "n_groups": 25,
+  "gap_below_threshold": 0.0393,
+  "note": "Never hold two tickers from the same group. Renames are one security under two symbols; dual classes are one issuer. Both break per-ticker concentration limits.",
+  "groups": [
+    {
+      "members": [
+        "ABC",
+        "COR"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "ANTM",
+        "ELV"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "BALL",
+        "BLL"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "BHGE",
+        "BKR"
+      ],
+      "min_corr": 0.9999,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "CCE",
+        "CCEP"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "CPAY",
+        "FLT"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "CPRI",
+        "KORS"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "CTL",
+        "LUMN"
+      ],
+      "min_corr": 0.9999,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "DD",
+        "DWDP"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "DISCA",
+        "DISCK"
+      ],
+      "min_corr": 0.9673,
+      "likely": "likely_dual_class",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "DOC",
+        "PEAK"
+      ],
+      "min_corr": 0.9936,
+      "likely": "likely_dual_class",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "EG",
+        "RE"
+      ],
+      "min_corr": 0.9999,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "FB",
+        "META"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "FOX",
+        "FOXA"
+      ],
+      "min_corr": 0.9865,
+      "likely": "likely_dual_class",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "GEN",
+        "NLOK"
+      ],
+      "min_corr": 0.9999,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "GL",
+        "TMK"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "GOOG",
+        "GOOGL"
+      ],
+      "min_corr": 0.9952,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "HRS",
+        "LHX"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "J",
+        "JEC"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "MMC",
+        "MRSH"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "NWS",
+        "NWSA"
+      ],
+      "min_corr": 0.9717,
+      "likely": "likely_dual_class",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "PKI",
+        "RVTY"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "RTX",
+        "UTX"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "SW",
+        "WRK"
+      ],
+      "min_corr": 1.0,
+      "likely": "likely_rename",
+      "label_is_advisory": true
+    },
+    {
+      "members": [
+        "WLTW",
+        "WTW"
+      ],
+      "min_corr": 0.9862,
+      "likely": "likely_dual_class",
+      "label_is_advisory": true
+    }
+  ]
+}

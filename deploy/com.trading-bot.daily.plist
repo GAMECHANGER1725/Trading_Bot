@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Daily run, 16:35 US Eastern, weekdays.
+
+  WHY launchd AND NOT cron
+  A MacBook Air is asleep at 06:35 Sydney. cron silently skips any run whose
+  time passed while the machine was asleep — no error, no log, the bot simply
+  never traded that day and nothing says so. launchd queues a missed
+  StartCalendarInterval and fires it on wake.
+
+  WHY THE TIME IS EXPRESSED IN EASTERN
+  launchd uses the machine's local timezone, which for this laptop is
+  Australia/Sydney. 16:35 America/New_York is 06:35 Sydney during US daylight
+  saving and 07:35 Sydney otherwise, because the two countries change on
+  different dates. Rather than encode a time that is wrong for four months a
+  year, the wrapper script fires on a wide window and lets
+  `check_session_timing` decide: it asks the broker whether the market is open
+  and refuses to run if it is.
+
+  The entries below are Sydney local times covering both DST regimes. The
+  guardrail makes the extra firing harmless — a run while the market is open
+  is blocked, and a second run the same day is rejected by Alpaca on
+  client_order_id.
+
+  INSTALL
+    cp deploy/com.trading-bot.daily.plist ~/Library/LaunchAgents/
+    launchctl load  ~/Library/LaunchAgents/com.trading-bot.daily.plist
+    launchctl list | grep trading-bot          # confirm it is registered
+
+  UNINSTALL
+    launchctl unload ~/Library/LaunchAgents/com.trading-bot.daily.plist
+
+  EDIT THE TWO PATHS BELOW before installing.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.trading-bot.daily</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <!-- EDIT THIS PATH -->
+        <string>cd "$HOME/Downloads/Home/Trading_Bot" &amp;&amp; /usr/bin/python3 scripts/daily_run.py --live</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <!-- 06:35 Sydney = 16:35 ET during US daylight saving -->
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>6</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>35</integer></dict>
+        <!-- 07:35 Sydney = 16:35 ET outside US daylight saving -->
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>6</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>35</integer></dict>
+    </array>
+
+    <!-- EDIT THESE TWO PATHS -->
+    <key>StandardOutPath</key>
+    <string>/Users/vaidikpatel/Downloads/Home/Trading_Bot/data/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/vaidikpatel/Downloads/Home/Trading_Bot/data/launchd.err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

@@ -1,0 +1,31 @@
+# SECRETS — never commit. Alpaca keys live here (D11).
+.env
+*.pem
+*.key
+
+# Large regenerable data. Bars come from Alpaca via scripts/refetch_bars.py,
+# feature panels from scripts/build_panel_all.py. Committing 100MB+ of parquet
+# that a script rebuilds in three minutes is not version control.
+data/bars/
+data/*.parquet
+data/_stage*/
+data/_s3/
+data/_g/
+data/_to_delete/
+
+# THE SEALED HOLDOUT. Deliberately listed even though *.parquet already covers
+# it: the 2025+ holdout has never been evaluated and its single unbiased shot
+# is the most valuable thing in this project. It does not go anywhere it might
+# be casually opened.
+data/*holdout*
+
+# Runtime
+__pycache__/
+*.pyc
+*.log
+*.tmp
+data/run_state.json.tmp
+HALT
+
+# OS
+.DS_Store

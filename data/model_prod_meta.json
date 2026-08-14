@@ -1,0 +1,43 @@
+{
+  "model": "v1",
+  "architecture": "XGBClassifier, binary:logistic",
+  "label": "beats the day's median 5-day forward return",
+  "features": [
+    "mom_5",
+    "mom_20",
+    "mom_60",
+    "mom_120",
+    "reversal_1",
+    "vol_20",
+    "vol_ratio",
+    "volume_ratio",
+    "dollar_volume",
+    "px_sma20",
+    "px_sma50",
+    "px_sma200",
+    "range_pos_252",
+    "gap_20"
+  ],
+  "n_features": 14,
+  "trained_rows": 627844,
+  "train_start": "2020-01-02",
+  "train_end": "2024-12-31",
+  "params": {
+    "max_depth": 4,
+    "n_estimators": 300,
+    "learning_rate": 0.03,
+    "subsample": 0.7,
+    "colsample_bytree": 0.7,
+    "min_child_weight": 200,
+    "reg_lambda": 5.0,
+    "reg_alpha": 1.0,
+    "objective": "binary:logistic",
+    "eval_metric": "logloss",
+    "tree_method": "hist",
+    "n_jobs": 4,
+    "random_state": 42
+  },
+  "expected_oos_accuracy": 0.5071,
+  "expected_oos_accuracy_se": 0.0031,
+  "warning": "Placeholder ranker. Accuracy edge +0.71pp, t=2.33, fails Bonferroni across the 8 cells it was selected from. Does not beat SPY at any measurable position count. See D31."
+}

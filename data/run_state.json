@@ -1,0 +1,107 @@
+{
+  "peak_equity": 100000.0,
+  "positions": {
+    "CSCO": {
+      "entry_date": "2026-08-14",
+      "qty": 33
+    },
+    "NVDA": {
+      "entry_date": "2026-08-14",
+      "qty": 16
+    },
+    "GOOG": {
+      "entry_date": "2026-08-14",
+      "qty": 10
+    },
+    "ADI": {
+      "entry_date": "2026-08-14",
+      "qty": 9
+    },
+    "BSX": {
+      "entry_date": "2026-08-14",
+      "qty": 73
+    },
+    "V": {
+      "entry_date": "2026-08-14",
+      "qty": 10
+    },
+    "AZO": {
+      "entry_date": "2026-08-14",
+      "qty": 1
+    },
+    "TXN": {
+      "entry_date": "2026-08-14",
+      "qty": 13
+    },
+    "GEV": {
+      "entry_date": "2026-08-14",
+      "qty": 3
+    },
+    "GE": {
+      "entry_date": "2026-08-14",
+      "qty": 10
+    },
+    "C": {
+      "entry_date": "2026-08-14",
+      "qty": 27
+    },
+    "BAC": {
+      "entry_date": "2026-08-14",
+      "qty": 58
+    },
+    "DELL": {
+      "entry_date": "2026-08-14",
+      "qty": 7
+    },
+    "AVGO": {
+      "entry_date": "2026-08-14",
+      "qty": 9
+    },
+    "LLY": {
+      "entry_date": "2026-08-14",
+      "qty": 3
+    },
+    "ANET": {
+      "entry_date": "2026-08-14",
+      "qty": 18
+    },
+    "RTX": {
+      "entry_date": "2026-08-14",
+      "qty": 17
+    },
+    "MS": {
+      "entry_date": "2026-08-14",
+      "qty": 17
+    },
+    "XOM": {
+      "entry_date": "2026-08-14",
+      "qty": 23
+    },
+    "MCD": {
+      "entry_date": "2026-08-14",
+      "qty": 13
+    },
+    "BA": {
+      "entry_date": "2026-08-14",
+      "qty": 16
+    },
+    "ACN": {
+      "entry_date": "2026-08-14",
+      "qty": 21
+    },
+    "CVX": {
+      "entry_date": "2026-08-14",
+      "qty": 19
+    },
+    "INTC": {
+      "entry_date": "2026-08-14",
+      "qty": 36
+    },
+    "AMGN": {
+      "entry_date": "2026-08-14",
+      "qty": 9
+    }
+  },
+  "runs": 6,
+  "account_number": "PA3VR8OK3RL7"
+}
