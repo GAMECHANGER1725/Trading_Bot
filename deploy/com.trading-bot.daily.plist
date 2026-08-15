@@ -30,7 +30,7 @@
   UNINSTALL
     launchctl unload ~/Library/LaunchAgents/com.trading-bot.daily.plist
 
-  EDIT THE TWO PATHS BELOW before installing.
+  Paths below already point at Trading_Bot_repo, the GitHub working copy.
 -->
 <plist version="1.0">
 <dict>
@@ -41,8 +41,7 @@
     <array>
         <string>/bin/bash</string>
         <string>-lc</string>
-        <!-- EDIT THIS PATH -->
-        <string>cd "$HOME/Downloads/Home/Trading_Bot" &amp;&amp; /usr/bin/python3 scripts/daily_run.py --live</string>
+            <string>cd "$HOME/Downloads/Home/Trading_Bot/Trading_Bot_repo" &amp;&amp; /usr/bin/python3 scripts/daily_run.py --live</string>
     </array>
 
     <key>StartCalendarInterval</key>
@@ -61,11 +60,10 @@
         <dict><key>Weekday</key><integer>6</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>35</integer></dict>
     </array>
 
-    <!-- EDIT THESE TWO PATHS -->
     <key>StandardOutPath</key>
-    <string>/Users/vaidikpatel/Downloads/Home/Trading_Bot/data/launchd.out.log</string>
+    <string>/Users/vaidikpatel/Downloads/Home/Trading_Bot/Trading_Bot_repo/data/launchd.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/vaidikpatel/Downloads/Home/Trading_Bot/data/launchd.err.log</string>
+    <string>/Users/vaidikpatel/Downloads/Home/Trading_Bot/Trading_Bot_repo/data/launchd.err.log</string>
 
     <key>RunAtLoad</key>
     <false/>

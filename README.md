@@ -131,6 +131,14 @@ Each of these produced plausible, wrong output with no error raised:
 Paper only. Moving to real money is a separate decision requiring evidence,
 not a config change.
 
-Success bar: **beats SPY buy-and-hold on risk-adjusted return, over 200+
-trades, on data the model has never seen.** Not met. The 2025+ holdout has
-never been evaluated — its single unbiased shot is preserved.
+Success bar, amended 14 Aug 2026 (D37): the original bar — beat SPY on
+risk-adjusted return over 200+ trades — was retired as **undecidable**. A
+Sharpe difference of 0.2 requires ~118 years of a single market to
+demonstrate; the holdout is 1.03 years and has no statistical power at any
+effect size. The current bar is **match SPY's return at materially lower
+volatility**, because volatility is measurable to ±1.4% relative on this
+sample and return is not (±35%).
+
+See `PLAN_BEAT_SPY.md` for the measurement work behind that change: the bot
+is a 0.68-beta SPY proxy with alpha t = −0.25, and two runs of the *same*
+model config differ by 7.4 percentage points a year in backtest.

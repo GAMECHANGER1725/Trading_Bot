@@ -1542,6 +1542,172 @@ strategy is expected to beat buy-and-hold.
 **Expect it to underperform SPY.** If it does, that is the prediction, not a
 surprise, and the value was the systems evidence.
 
+### D37 — The instrument is cruder than the effect. Stop tuning the model.
+
+Asked how to make the model beat SPY. Measured first. The answer is that the
+question cannot currently be answered, and that is the finding.
+
+**The bot is a levered-down SPY proxy.** Regressing daily returns on SPY,
+2022–2024: beta 0.68 (t = 24.7), annual alpha −1.9% (t = −0.25), 95% CI on
+alpha [−16.9%, +13.1%]. Across all 8 configs plus a momentum baseline, zero
+have |t(alpha)| > 2. Six of nine lose to SPY held at their own volatility.
+
+**The 2022 result is exposure, not skill.** Decomposing: beta × SPY explains
+−13.0% of the bot's −9.9%. The residual, the part the model added, is +3.1%
+against an annual error bar of ±11%. "Beat SPY by 17.8% in 2022" is being 68%
+invested during a crash.
+
+**The backtest cannot resolve the differences it is being used to rank.**
+`preds_v1_window.parquet` and `preds_CLS_price.parquet` are the same spec —
+CLS, price-only — run twice. They agree at rank correlation 0.962 and pick 20
+of the same 25 names daily. Their backtested returns are 10.60% and 3.18%. A
+five-name-a-day difference moves the headline 7.4pp/yr, and the whole 8-cell
+bakeoff spans 19pp. Block bootstrap on the equity curve confirms it: SE on
+annual return ±11.1pp, SE on Sharpe ±0.63, against SPY's total Sharpe of 0.49.
+D30 and D31 measured the noise floor on accuracy and IC. Nobody measured it on
+the equity curve, which is the number every decision was actually made on.
+
+**The sealed holdout has no power at any effect size.** It is 2025-01-02 →
+2026-01-14: 259 days, 1.03 years. For the Jobson–Korkie/Memmel Sharpe
+difference test, T must exceed 1.92 years before *any* effect becomes
+detectable — below that the standard error grows with the effect faster than
+the effect does. Proving ΔSharpe = 0.20 on SPY alone needs ~118 years. The
+success bar as written is not a high bar; it is an undecidable one.
+
+**Breadth does not fix it, because the universe is one bet.** Average pairwise
+correlation across 402 S&P names is 0.414 → ~2.4 effective independent bets.
+Vol-targeting applied unchanged to all 402: win rate 56.7% ± 18.0% (joint-time
+block bootstrap, preserving cross-sectional correlation). The naive binomial
+SE of ±2.5% understates the error 7×. Widening to 15 cross-asset ETFs raises
+it only to 3.2 effective bets.
+
+**What survives.** Over 10.6 years, annual volatility is measured to ±1.4%
+relative and annual return to ±35% relative — volatility is ~26× more
+precisely measurable. Volatility also persists (month-to-month correlation
++0.52) where return does not (−0.15). Risk parity + vol targeting on 15 ETFs
+returns 15.88% vs SPY's 16.05% at 13.65% vol vs 17.48%: the return claim is
+unprovable, the −21.9% volatility claim is conclusive. Note the honest
+caveat — on the bot's own 2022–2024 window that same strategy scores Sharpe
+0.38 against SPY's 0.49. Its ten-year edge is a 2016–2021 artefact. The
+regime-dependence warning applies to the replacement as much as the incumbent.
+
+**Decision.** Stop feature engineering and stop adding model configurations;
+both are being evaluated on an instrument that cannot read them. Order of
+work: (1) extend the backtest from 3 years to 8 — 2016–2026 bars are already
+on disk and unused; (2) make bootstrap CIs mandatory on every equity-curve
+number in code; (3) re-run the bakeoff with CIs and formally close the config
+question; (4) build a cross-asset risk-controlled sleeve on the existing,
+audited execution layer. Reintroduce stock selection only as an overlay, only
+after the instrument can see a 2% effect.
+
+**Success bar amended.** "Beats SPY on risk-adjusted return over 200+ trades"
+is retired as undecidable at this sample size. Replaced with: *matches SPY's
+return at materially lower volatility, where the volatility reduction is
+statistically conclusive and the return shortfall is bounded.* The holdout is
+demoted from significance test to consistency check — the only question it may
+be asked is whether the forward result falls inside the backtest's confidence
+interval. One evaluation, one candidate, rule written first.
+
+Full working: `PLAN_BEAT_SPY.md`, scripts in `scripts/analysis/`.
+
+### D38 — The edge halves when the test window doubles. Signal search is over.
+
+Papaya asked whether v4 was trained on less data than v1 and should be
+retrained on eight years. Both halves are false: v1 and v4 share an identical
+expanding walk-forward on the 2020-2024 dev panel (test folds 2022/23/24,
+seed 42, same params, same `FEATURE_NAMES` base), and nothing in the project
+has ever trained on eight years — production v1 is 2020-01-02 to 2024-12-31.
+
+The question exposed a real asymmetry anyway. Form 4 filings cover
+2020-01-02 to 2025-07-14; price bars cover 2016-01-04 to 2026-02-27. v4 can
+never be extended earlier — the data does not exist — which is why
+`build_panel_all.py` truncates everything to 2020 to keep the comparison
+like-for-like. The price-only model has therefore been judged on 3 test folds
+when 6 were available.
+
+**Ran it.** Same architecture, seed, hyperparameters and engine; only the
+window moves.
+
+  3 folds (2022-24): out-of-sample accuracy 0.5070, forward IC +0.0167
+  6 folds (2019-24): out-of-sample accuracy 0.5039, forward IC +0.0085
+
+The accuracy edge halves, +0.70pp to +0.39pp, against an accuracy SE of
+0.0031. `model_prod_meta.json` advertises 0.5071; the honest number is 0.5039,
+which is 1.3 SE from a coin flip. Backtested, the bot loses to SPY on both
+windows and by more on the longer one: Sharpe 0.16 vs 0.49 on 2022-24,
+0.55 vs 0.89 on 2019-24.
+
+**Two corrections to D37.** First, extending 3 to 6 years shrank the SE on
+annual return only 1.14x (±9.56% to ±8.40%), not the ~1.6x predicted. The
+added years contain COVID, so strategy volatility rose 15.39% to 18.22% and
+absorbed most of the sqrt(T) gain. The forecast assumed constant volatility —
+the exact assumption D37 argues against everywhere else. More history does not
+buy proportional precision when the added history is more turbulent.
+
+Second, D37 measured the same-spec reproducibility gap at 7.4pp/yr from two
+runs. A third run of that cell — CLS, `FEATURE_NAMES`, seed 42, identical
+params and window, price-only panel of 673 symbols — returns 2.49%/yr against
+the recorded 3.18% and 10.60%. **Spread 8.1pp/yr, caused by nothing but which
+rows the panel intersection retained.**
+
+**Also flagged:** Form 4 coverage ends 2025-07-14 while the holdout runs to
+2026-01-14. Any insider-flavoured model scored on the holdout would evaluate
+the back half on absent features, and D29 documents a missing-data sentinel
+re-importing survivorship bias at t = +2.67. Production is price-only and
+`daily_run.py` asserts `meta["features"] == FEATURE_NAMES`. That assert is
+load-bearing. Do not remove it.
+
+**Decision.** Extending the window was worth doing, but not for the reason
+D37 gave. It bought almost no precision; it converted an apparent +0.70pp edge
+into a measured +0.39pp non-edge. That is the correct use of more data — not
+to improve the number, but to establish the number was never there. The
+price-only signal does not survive its own test window being doubled. Signal
+search on daily price data over S&P 500 large caps is closed. Proceed to
+Phase 1 (cross-asset, risk-controlled) on the existing execution layer.
+
+### D39 — "Which model is best" fails an ANOVA. There is no winner.
+
+Ranked all eight cells on accuracy, forward IC, return, Sharpe and alpha.
+The metrics do not agree: the highest-accuracy cell (v1, 0.5071) is eighth of
+eight on return; the highest-return cell (REG price+v3+insider, 17.65%) is
+sixth on accuracy. Every |t(alpha)| < 1.2, every |t(IC)| < 1.3.
+
+A block bootstrap over time looks like it produces a winner — v4 takes #1 in
+42.4% of resamples and beats SPY in 74.4%. It does not. That bootstrap
+resamples the calendar while holding the trained model fixed, so it is blind
+to the larger source of variation measured in D38.
+
+Re-ran the race with the same specification entered twice, as separate
+entrants, identical architecture / seed / hyperparameters / window / costs:
+
+  v4 run A (panel_all)  15.26%/yr, Sharpe 0.81, takes #1 in 38.6% of resamples
+  v4 run B (panel_v4)    3.65%/yr, Sharpe 0.19, takes #1 in  0.1% of resamples
+
+A 386-fold difference between a model and itself. The gap between the two v4
+runs is 38.5 points; the gap between v4 run B and v1 run B is 18.4 points.
+Within-specification variation is more than twice between-specification
+variation.
+
+One-way ANOVA on annual return, grouped by feature set — v1 {3.18, 10.60,
+2.49}, v4 {15.26, 3.65}: between-spec difference 4.03pp against a pooled
+within-spec SD of 6.00pp, F = 0.543, p = 0.515. The insider features explain
+none of the return spread. Neither does architecture.
+
+**Decision.** There is no best model and the data cannot produce one. Any
+ranking is a ranking of which realisation was written to which CSV. Note what
+tops the naive table — v4 and best-of-8 — were both chosen after seeing
+results; their apparent advantage IS the selection.
+
+v1 stays in production, unchanged. Not because it won — it is eighth of eight
+on return — but because it was named before the results were seen and is the
+cheapest thing to be wrong with. `model_prod_meta.json` already describes it
+as a placeholder that fails Bonferroni across the 8 cells it was selected
+from. That description stands and should not be softened.
+
+The model bake-off is closed permanently. Do not reopen it, do not add a ninth
+cell, and do not re-rank these eight. Phase 1 (cross-asset, risk-controlled,
+zero fitted parameters) is the only remaining direction.
+
 ### D11 — Credentials live only in `.env`
 Keys are stored in `Trading_Bot/.env`, gitignored, loaded by every script.
 Not duplicated into memory files, notes, or source. Paper key IDs start with
@@ -1561,8 +1727,16 @@ Not duplicated into memory files, notes, or source. Paper key IDs start with
 
 ## Success bar
 
-Beats SPY buy-and-hold on risk-adjusted return, over 200+ trades, on data
-the model has never seen. Nothing else counts as evidence.
+~~Beats SPY buy-and-hold on risk-adjusted return, over 200+ trades, on data
+the model has never seen.~~ **Retired 14 Aug 2026 (D37) — undecidable.** A
+Sharpe difference of 0.2 needs ~118 years of one market to demonstrate; the
+holdout is 1.03 years and has no power at any effect size.
+
+Replaced with: **matches SPY's return at materially lower volatility, where
+the volatility reduction is statistically conclusive and the return shortfall
+is bounded.** Volatility is measurable to ±1.4% relative on this sample;
+return is not, at ±35%. The bar has to sit on the half of the ratio that can
+actually be measured.
 
 ## Realistic expectation
 
