@@ -1762,6 +1762,60 @@ true tomorrow?". An order is not a fact; it is a fact with an expiry date. Any
 future check on broker state must assert on what persists, not on what was
 accepted.
 
+### D41 — The project moves to Claude Code. What that changes, and what it does not.
+
+Everything of substance already lived in the repo: D1-D40, `PLAN_BEAT_SPY.md`,
+`STATUS.md`, and the guardrail suite. What was missing was the operating layer —
+the rules a fresh session needs before it touches anything.
+
+**Added.**
+
+`CLAUDE.md`, loaded into every session: the six hard rules, the closed
+questions with their D-numbers, the file map, and the data spans. It points at
+`DECISIONS.md` rather than restating it, because a memory file that duplicates
+the record will drift from it.
+
+`scripts/health_check.py`, the operational form of the D40 lesson. D34 audited
+what happens when the bot runs; this audits what survives afterwards. It
+asserts every position has a live protective order, every open order is GTC, no
+unfilled BUY predates today, state agrees with the broker, nothing is overdue
+for the time stop, and the schedule is still firing. Read-only, exit 1 on a
+real problem.
+
+It found something on its first run: `run_state.json` still listed GE, whose
+entry expired unfilled. Self-healing — `prune_state_to_broker` clears it next
+session — so it reports as a warning. But a state file that quietly disagrees
+with the broker is precisely how positions were orphaned in D34, so it is
+reported rather than tolerated.
+
+The script also shipped with a defect of its own, caught immediately: it
+printed failure text next to passing checks. A green tick sitting beside an
+alarming sentence trains you to skim, and skimming is how D40 survived 54
+passing tests. Pass and fail now print different strings.
+
+`.claude/commands/`: `/verify` (tests, health, dry run), `/audit` (the paper
+account, leading with exposure rather than P&L), `/decision` (the shape a
+D-entry must have, including the "why did the tests miss it" line), and
+`/preflight` (the checklist before touching order-submitting code).
+
+`.claude/settings.json` pre-approves read-only and dry-run scripts and **denies
+anything matching `--live`**. This is deliberate and should not be relaxed for
+convenience. Submitting orders is a decision a human makes in the moment, not a
+permission granted once in a config file. Reading `.env` is denied (D11), and
+so is anything matching `*holdout*` — the 2025 holdout has never been evaluated
+and merely reading it in a session spends its single unbiased shot.
+
+**Not changed.** No model, no strategy, no guardrail, no execution path. 58
+tests still pass. Moving tooling is not an occasion to touch the thing being
+tooled.
+
+**What does not transfer.** Neither environment can push to GitHub: the cloud
+sandbox has network but no authorisation for this repo, and the device bridge
+has authorisation but no network. Commit locally, push manually. Two attempts
+at bundle- and merge-based workarounds failed and left `.git` lock files that
+had to be cleared by hand; `CLAUDE.md` records this so it is not attempted a
+third time.
+
 ### D11 — Credentials live only in `.env`
 Keys are stored in `Trading_Bot/.env`, gitignored, loaded by every script.
 Not duplicated into memory files, notes, or source. Paper key IDs start with

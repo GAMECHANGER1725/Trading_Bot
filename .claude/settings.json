@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 scripts/test_guardrails.py)",
+      "Bash(python3 scripts/health_check.py)",
+      "Bash(python3 scripts/daily_run.py)",
+      "Bash(python3 scripts/repair_brackets.py)",
+      "Bash(python3 scripts/analysis/*)",
+      "Bash(python3 scripts/noise_floor.py)",
+      "Bash(python3 scripts/bakeoff*.py)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [
+      "Bash(python3 scripts/daily_run.py --live)",
+      "Bash(python3 scripts/repair_brackets.py --live)",
+      "Bash(*--live*)",
+      "Read(./.env)",
+      "Read(./data/*holdout*)",
+      "Bash(*holdout*)",
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}

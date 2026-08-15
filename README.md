@@ -56,6 +56,8 @@ src/
 scripts/
   daily_run.py             the daily job. Dry run by default
   test_guardrails.py       58 assertions. Every check driven into failure
+  health_check.py          persistent broker state — the D40 class of bug
+  repair_brackets.py       one-time: re-arm positions that lost their legs
   train_prod_model.py      trains data/model_prod.json
   build_issuer_map.py      finds ticker renames and dual share classes
   bakeoff.py               8-cell architecture x features grid
@@ -67,6 +69,7 @@ scripts/
 
 ```bash
 python3 scripts/test_guardrails.py     # expect: 58 passed, 0 failed
+python3 scripts/health_check.py        # what is still true at the broker now
 python3 scripts/daily_run.py           # dry run — submits nothing, writes nothing
 python3 scripts/daily_run.py --live    # submits
 touch HALT                             # kill switch. Stops everything, first check
@@ -89,6 +92,15 @@ broker whether the market is open and refuses to run if it is, so a bad
 schedule is caught rather than traded through.
 
 ---
+
+## Claude Code
+
+`CLAUDE.md` carries the operating rules and is loaded automatically.
+`.claude/commands/` has `/verify`, `/audit`, `/decision`, `/preflight`.
+`.claude/settings.json` pre-approves the read-only scripts and **denies
+anything containing `--live`** — submitting orders is a decision made in the
+moment, not a permission granted once in a config file. Reading `.env` and
+anything matching `*holdout*` is denied too.
 
 ## Rules this project runs on
 
