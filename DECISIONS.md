@@ -1708,6 +1708,60 @@ The model bake-off is closed permanently. Do not reopen it, do not add a ninth
 cell, and do not re-rank these eight. Phase 1 (cross-asset, risk-controlled,
 zero fitted parameters) is the only remaining direction.
 
+### D40 — The bracket was DAY. Every stop died at the first close.
+
+First live session, 14 Aug 2026. 25 orders submitted, 24 filled, GE expired
+unfilled (limit 362.44 never traded). By the next session the account held
+$86,459 of stock across 24 names and had **zero open orders**.
+
+`submit_bracket` sent `"time_in_force": "day"`. Alpaca's bracket child legs
+inherit the parent's TIF and cannot be set independently at submission. At the
+close every take-profit leg went EXPIRED and every stop-loss leg went CANCELED
+as its OCO sibling. Verified directly against the broker: 24 parents FILLED,
+24 legs EXPIRED, 24 legs CANCELED, 0 open.
+
+**The 8% stop and 12% target existed for 6.5 hours of a 10-day hold.**
+
+What that costs, measured on 2022-2024 across all S&P names:
+
+  exit mix   time 78.8% (mean +1.01%), stop 15.4% (-8.00%), target 5.8% (+12.00%)
+  21.2% of trades have their outcome SET by the bracket
+  1st-percentile trade  bracketed -8.00%  ->  unbracketed -16.44%
+  per-trade volatility  5.55%  ->  19.62%  (+253%)
+  worst single trade    -8.00%  ->  -87.09%
+
+Every backtest number in this repo assumes those barriers are standing. The
+2022 drawdown protection that is the strategy's only attractive property comes
+entirely from stops firing. Unprotected, the strategy is a fixed 10-day hold
+with a 253% wider outcome distribution — a different strategy, not a degraded
+one.
+
+**How it survived D34's audit and 54 tests.** The pre-live audit checked
+whether orders were *accepted*, whether they were *idempotent*, and whether
+the legs could be *cancelled* before liquidation. Nothing checked whether the
+legs were still there the next morning. The bracket was verified at submission
+and never at rest. `time_in_force` was one hardcoded string that no test read.
+
+**Fix.** `submit_bracket` now sends `"gtc"`. The cost of GTC is that an
+unfilled entry no longer self-expires — GE cleaned itself up correctly under
+DAY — so `cancel_stale_entries()` in daily_run.py clears prior-session unfilled
+BUYs before ranking. It touches BUY orders only; protective SELL legs are the
+entire point and must survive. It runs after the US close, so a cancelled
+order cannot fill overnight. Four assertions added (58 tests, up from 54): TIF
+is gtc, TIF is not day, cleanup is buy-only, cleanup submits nothing on a dry
+run.
+
+Positions opened before the fix are not re-armed by anything.
+`scripts/repair_brackets.py` attaches a GTC OCO to each, anchored to the actual
+average fill price (D35), and skips any name already trading below its stop
+rather than firing an instant market sell. Dry run by default.
+
+**The general lesson, which is the reason this is written down.** D34 found six
+bugs by asking "what happens when this runs?". This one needed "what is still
+true tomorrow?". An order is not a fact; it is a fact with an expiry date. Any
+future check on broker state must assert on what persists, not on what was
+accepted.
+
 ### D11 — Credentials live only in `.env`
 Keys are stored in `Trading_Bot/.env`, gitignored, loaded by every script.
 Not duplicated into memory files, notes, or source. Paper key IDs start with

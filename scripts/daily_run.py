@@ -192,6 +192,46 @@ def entry_dates_from_broker(broker: PaperBroker) -> dict[str, str]:
     return out
 
 
+def cancel_stale_entries(broker: PaperBroker, today: str, *, live: bool) -> list[str]:
+    """
+    Cancel unfilled BUY orders left over from a previous session.
+
+    Required by the switch to GTC brackets (see broker.submit_bracket). With
+    DAY orders an unfilled entry expired at the close and cleaned itself up —
+    GE did exactly that on 14 Aug 2026, correctly. Under GTC it would instead
+    sit there and could fill days later at a limit price the model set against
+    a stale reference close, taking a position nothing in today's ranking asked
+    for and skewing the size of the book.
+
+    Protective SELL legs are deliberately left alone. They are the whole point
+    of GTC and must survive.
+
+    Safe to run here because the job executes after the US close: a cancelled
+    order cannot fill overnight, and today's fresh orders are submitted later
+    in the same run.
+    """
+    stale = []
+    for o in broker.orders(status="open", limit=500):
+        if str(o.get("side")) != "buy":
+            continue
+        submitted = str(o.get("submitted_at", ""))[:10]
+        if submitted and submitted < today:
+            stale.append((o.get("symbol"), o.get("id"), submitted))
+    if not stale or not live:
+        return [s for s, _, _ in stale]
+    done = []
+    for sym, oid, when in stale:
+        try:
+            r = broker.session.delete(f"{broker.base}/v2/orders/{oid}", timeout=30)
+            if r.status_code in (200, 204):
+                done.append(sym)
+                log_event("stale_entry_cancelled",
+                          {"symbol": sym, "submitted": when, "live": live})
+        except Exception as e:                                  # noqa: BLE001
+            print(f"  WARNING: could not cancel stale {sym}: {e}")
+    return done
+
+
 def prune_state_to_broker(state: dict, positions: list[dict],
                           broker: PaperBroker) -> tuple[list[str], list[str]]:
     """
@@ -384,6 +424,13 @@ def main() -> int:
         log_event("peak_reset", {"old": prev_peak, "new": equity, "live": live})
         state["peak_equity"] = 0.0
     state["peak_equity"] = max(state.get("peak_equity", 0.0), equity)
+
+    # Brackets are GTC so their protective legs survive the close; the cost is
+    # that an unfilled ENTRY also survives. Clear yesterday's before ranking.
+    stale = cancel_stale_entries(broker, today.isoformat(), live=live)
+    if stale:
+        print(f"cancelled {len(stale)} stale unfilled entry order(s): "
+              f"{', '.join(sorted(stale))}")
 
     exited, recovered = prune_state_to_broker(state, positions, broker)
     print(f"equity ${equity:,.2f}   cash ${cash:,.2f}   "

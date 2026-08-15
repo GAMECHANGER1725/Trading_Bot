@@ -156,7 +156,26 @@ class PaperBroker:
             "symbol": symbol,
             "qty": str(int(qty)),
             "side": "buy",
-            "time_in_force": "day",
+            # GTC, not DAY. Alpaca's bracket child legs inherit the parent's
+            # time-in-force, and there is no way to set them independently at
+            # submission. With "day" the take-profit leg EXPIRES and the
+            # stop-loss leg is CANCELLED as its OCO sibling at that session's
+            # close — so a 10-day hold is protected for its first 6.5 hours and
+            # naked for the remaining nine days.
+            #
+            # Verified on the live paper account, 14 Aug 2026: 24 positions
+            # filled, and by the next session all 48 protective legs were gone,
+            # 0 open orders against $86,459 of stock. Every backtest number
+            # assumes those barriers are standing. 21.2% of trades are decided
+            # by them, and removing them widens the 1st-percentile trade from
+            # -8.00% to -16.44% and raises per-trade volatility by 253%.
+            #
+            # The cost of GTC: an entry that does not fill no longer expires at
+            # the close, so a stale limit from a previous session could fill at
+            # a price the model never chose. `cancel_stale_entries` in
+            # daily_run.py clears those before new orders go out. That runs
+            # after the close, so a cancelled order cannot fill overnight.
+            "time_in_force": "gtc",
             "order_class": "bracket",
             "client_order_id": coid,
             "stop_loss": {"stop_price": round(ref_price * (1 - stop_pct), 2)},

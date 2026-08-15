@@ -222,6 +222,37 @@ def main() -> int:
     print(f"  {'different day -> different id':<44} "
           f"{'ok' if diff else '*** TEST FAILED ***'}")
 
+    # The bracket is the entire risk model. On 14 Aug 2026 all 24 filled
+    # positions lost both protective legs at the first close because the
+    # parent was DAY and Alpaca's legs inherit the parent's TIF. Nothing
+    # tested the one field the stop-loss depends on. It is tested now.
+    print("\nBRACKET SURVIVES THE CLOSE (D40)")
+    import inspect
+    from src.broker import PaperBroker as _PB
+    src = inspect.getsource(_PB.submit_bracket)
+    gtc = '"time_in_force": "gtc"' in src
+    no_day = '"time_in_force": "day"' not in src
+    (PASSED if gtc else FAILED).append("bracket TIF is gtc")
+    (PASSED if no_day else FAILED).append("bracket TIF is not day")
+    print(f"  {'entry submitted GTC, so legs are GTC':<44} "
+          f"{'ok' if gtc else '*** TEST FAILED ***'}")
+    print(f"  {'no DAY tif anywhere in submit_bracket':<44} "
+          f"{'ok' if no_day else '*** TEST FAILED ***'}")
+
+    # GTC entries do not self-expire, so the cleanup that replaces that must
+    # exist, must only ever touch BUY orders, and must never touch the
+    # protective sell legs.
+    from scripts.daily_run import cancel_stale_entries as _cse
+    csrc = inspect.getsource(_cse)
+    buy_only = 'o.get("side")) != "buy"' in csrc
+    dry_safe = 'if not stale or not live' in csrc
+    (PASSED if buy_only else FAILED).append("stale cleanup is buy-only")
+    (PASSED if dry_safe else FAILED).append("stale cleanup respects dry run")
+    print(f"  {'stale cleanup cancels BUYs only':<44} "
+          f"{'ok' if buy_only else '*** TEST FAILED ***'}")
+    print(f"  {'stale cleanup submits nothing on dry run':<44} "
+          f"{'ok' if dry_safe else '*** TEST FAILED ***'}")
+
     print("\n" + "=" * 72)
     print(f"{len(PASSED)} passed, {len(FAILED)} failed")
     if FAILED:

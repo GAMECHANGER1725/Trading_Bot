@@ -55,7 +55,7 @@ src/
 
 scripts/
   daily_run.py             the daily job. Dry run by default
-  test_guardrails.py       54 assertions. Every check driven into failure
+  test_guardrails.py       58 assertions. Every check driven into failure
   train_prod_model.py      trains data/model_prod.json
   build_issuer_map.py      finds ticker renames and dual share classes
   bakeoff.py               8-cell architecture x features grid
@@ -66,7 +66,7 @@ scripts/
 ## Running it
 
 ```bash
-python3 scripts/test_guardrails.py     # expect: 54 passed, 0 failed
+python3 scripts/test_guardrails.py     # expect: 58 passed, 0 failed
 python3 scripts/daily_run.py           # dry run — submits nothing, writes nothing
 python3 scripts/daily_run.py --live    # submits
 touch HALT                             # kill switch. Stops everything, first check
@@ -125,6 +125,10 @@ Each of these produced plausible, wrong output with no error raised:
 11. The bracket was anchored to yesterday's close while the backtest and
     labels anchored to the fill. Every historical number graded a trade the
     bot could not place (D35)
+12. The bracket was submitted DAY, so Alpaca expired every take-profit and
+    cancelled every stop at the first close. 24 live positions, $86k, zero
+    open orders. The stops existed for 6.5 hours of a 10-day hold, and 21.2%
+    of trades are decided by them (D40)
 
 ## Status
 
