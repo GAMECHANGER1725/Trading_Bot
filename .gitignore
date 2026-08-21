@@ -29,3 +29,8 @@ HALT
 
 # OS
 .DS_Store
+
+# Crypto NNFX experiment runtime artefacts (regenerated every poll)
+experiments/crypto_nnfx/paper_state.json
+experiments/crypto_nnfx/paper_trades*.csv
+experiments/crypto_nnfx/dashboard.html
