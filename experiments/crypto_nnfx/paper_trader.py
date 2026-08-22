@@ -682,10 +682,20 @@ def report(path=STATE_FILE):
     # controls collapse to one row: they are the yardstick, not competitors
     ctrls = [saved[k] for k in CONTROL_BOOKS if k in saved]
     if ctrls:
-        med = sorted(ctrls, key=lambda st: st["cash_equity"])[len(ctrls) // 2]
-        total += sum(st.get("wins", 0) + st.get("losses", 0) for st in ctrls)
-        line(f"control x{len(ctrls)}", med)
-        print(f"{'':16} {'(median of ' + str(len(ctrls)) + ' random-entry books)':>50}")
+        # Aggregate, not the median book. Early on most books sit at exactly
+        # $10,000, so "the median" is whichever one has not traded yet and the
+        # row reported 0/0 beside a non-zero total.
+        agg = {
+            "cash_equity": sum(st["cash_equity"] for st in ctrls) / len(ctrls),
+            "wins": sum(st.get("wins", 0) for st in ctrls),
+            "losses": sum(st.get("losses", 0) for st in ctrls),
+            "pnls": [x for st in ctrls for x in st.get("pnls", [])],
+            "positions": {f"{i}:{k}": v for i, st in enumerate(ctrls)
+                          for k, v in st.get("positions", {}).items()},
+            "halted_until_ms": max(st.get("halted_until_ms", 0) for st in ctrls),
+        }
+        total += line(f"control x{len(ctrls)}", agg)
+        print(f"{'':16} {'(pooled across ' + str(len(ctrls)) + ' random-entry books)':>50}")
     for name in REAL_BOOKS:
         if name in saved:
             total += line(name, saved[name])

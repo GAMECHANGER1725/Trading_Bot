@@ -412,15 +412,17 @@ def build_html(state, trades, live, generated, bench=None):
     if cs:
         c_trades = sum(c["trades"] for c in cs)
         c_means = sorted(c["avg_trade"] for c in cs)
-        c_eq = sorted(c["equity"] for c in cs)[len(cs) // 2]
+        # mean, not median: early on most books sit at exactly the starting
+        # figure, so the median is whichever one has not traded yet
+        c_eq = sum(c["equity"] for c in cs) / len(cs)
         c_wins = sum(c["wins"] for c in cs)
         cards.append(f"""
       <div class="card s0">
         <h3><span class="swatch" style="background:var(--s0)"></span>Control &times;{len(cs)} &middot; random entry</h3>
         <div class="figures">
-          <div class="fig"><span class="lbl">Median equity</span>
+          <div class="fig"><span class="lbl">Mean equity</span>
             <span class="v num">{fmt_money(c_eq)}</span></div>
-          <div class="fig"><span class="lbl">Median return</span>
+          <div class="fig"><span class="lbl">Mean return</span>
             <span class="v num {cls_for((c_eq / pt.INITIAL_CAPITAL - 1) * 100)}">{fmt_pct((c_eq / pt.INITIAL_CAPITAL - 1) * 100)}</span></div>
           <div class="fig"><span class="lbl">Trades</span>
             <span class="v num sm">{c_trades}</span></div>
