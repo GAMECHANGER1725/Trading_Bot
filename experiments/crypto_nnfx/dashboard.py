@@ -338,6 +338,11 @@ def build_html(state, trades, live, generated, bench=None):
     stats = strategy_stats(trades, state)
     curves = equity_curves(trades, state)
     total_trades = len(trades)
+    # The evidence meter tracks the STRATEGIES only. Counting the five control
+    # books here would fill it more than three times too fast and claim a
+    # sample that does not exist.
+    real_trades = sum(1 for t in trades if t["strategy"] in REAL)
+    real_target = SIGNIFICANCE_TARGET * len(REAL)
 
     # --- staleness: has the feed advanced recently? ---
     # last_close_ms is a {symbol: ms} map per account — flatten before comparing
@@ -373,7 +378,7 @@ def build_html(state, trades, live, generated, bench=None):
                 "candle.")
     elif min_real < 10 or ctrl_n < 10:
         headline = "Too early to read"
-        body = (f"{total_trades} trades so far. At this sample the standings are "
+        body = (f"{real_trades} strategy trades so far. At this sample the standings are "
                 "noise — a single trade reorders them. The number worth watching "
                 "is the trade count, not the returns.")
     elif not ctrl_means:
@@ -399,7 +404,7 @@ def build_html(state, trades, live, generated, bench=None):
             body += (f" Holding the same basket returned {fmt_pct(bench_ret)} over "
                      f"the same window, against {fmt_pct(best_ret)} for the best book.")
 
-    pct_done = min(total_trades / (SIGNIFICANCE_TARGET * 2) * 100, 100)
+    pct_done = min(real_trades / real_target * 100, 100)
 
     # --- strategy cards ---
     cards = []
@@ -550,8 +555,8 @@ def build_html(state, trades, live, generated, bench=None):
     <div>
       <h1>Bob</h1>
       <p class="tagline">Bob runs two rule-based strategies across {len(pt.SYMBOLS)} crypto
-        markets on live prices with simulated money, against a random-entry control
-        and buy-and-hold. No exchange account, no real capital. The question is not
+        markets on live prices with simulated money, against {len(CONTROLS)} random-entry
+        control books and buy-and-hold. No exchange account, no real capital. The question is not
         which book is ahead — it is whether either beats noise.</p>
     </div>
     <div class="stamp">
@@ -566,7 +571,7 @@ def build_html(state, trades, live, generated, bench=None):
     <div class="meter">
       <div class="meter-row">
         <span class="lbl">Evidence collected</span>
-        <span class="num" style="font-size:13px">{total_trades} of ~{SIGNIFICANCE_TARGET * 2} trades</span>
+        <span class="num" style="font-size:13px">{real_trades} of ~{real_target} strategy trades</span>
       </div>
       <div class="meter-track"><div class="meter-fill" style="width:{pct_done:.1f}%"></div></div>
       <div class="meter-row">
