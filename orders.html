@@ -1,0 +1,2315 @@
+<title>Bob · Orders</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#EDF0F2; --surface:#FFFFFF; --surface-2:#F6F8F9;
+  --ink:#10161C; --muted:#5C6B78; --line:#D4DBE0;
+  --accent:#2E5EAA; --s0:#8A8F98; --s1:#B4531F; --s2:#0F7A6C;
+  --pos:#1B7A3E; --neg:#B3261E; --warn:#8A6410;
+  --pos-bg:#E6F2EA; --neg-bg:#FBE9E7; --warn-bg:#FBF2DF;
+  --shadow:0 1px 2px rgba(16,22,28,.06),0 8px 24px rgba(16,22,28,.05);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1418; --surface:#131C22; --surface-2:#18242B;
+    --ink:#E4EBEF; --muted:#8798A5; --line:#233039;
+    --accent:#6E9BE8; --s0:#7E838C; --s1:#E08040; --s2:#35B8A5;
+    --pos:#3DBE6E; --neg:#E4574C; --warn:#D6A93C;
+    --pos-bg:#12271B; --neg-bg:#2A1614; --warn-bg:#251E0E;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1418; --surface:#131C22; --surface-2:#18242B;
+  --ink:#E4EBEF; --muted:#8798A5; --line:#233039;
+  --accent:#6E9BE8; --s0:#7E838C; --s1:#E08040; --s2:#35B8A5;
+  --pos:#3DBE6E; --neg:#E4574C; --warn:#D6A93C;
+  --pos-bg:#12271B; --neg-bg:#2A1614; --warn-bg:#251E0E;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  padding:32px 20px 64px;
+}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.num{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums}
+.lbl{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted)}
+
+/* header */
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
+  flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--line)}
+h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:30px;font-weight:600;
+  letter-spacing:-.015em;text-wrap:balance}
+.tagline{color:var(--muted);font-size:13.5px;margin-top:3px;max-width:62ch}
+.stamp{text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+  padding:4px 10px;border-radius:100px;border:1px solid transparent}
+.pill.live{background:var(--pos-bg);color:var(--pos);border-color:currentColor}
+.pill.stale{background:var(--warn-bg);color:var(--warn);border-color:currentColor}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+/* verdict */
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:20px 22px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+.verdict-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.verdict-head h2{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.verdict p{color:var(--muted);font-size:13.5px;max-width:78ch}
+.meter{display:flex;flex-direction:column;gap:7px}
+.meter-track{height:7px;border-radius:100px;background:var(--surface-2);
+  border:1px solid var(--line);overflow:hidden;display:flex}
+.meter-fill{background:var(--accent);height:100%}
+.meter-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+
+/* glossary */
+.glossary{display:flex;flex-direction:column}
+.gl{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:20px;
+  padding:13px 0;border-top:1px solid var(--line)}
+.gl:first-child{border-top:0;padding-top:0}
+.gl dt{font-weight:600;font-size:13.5px}
+.gl dd{color:var(--muted);font-size:13.5px;max-width:76ch}
+.gl dd em{font-style:normal;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:12.5px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+@media (max-width:640px){.gl{grid-template-columns:1fr;gap:4px}}
+
+/* nav */
+.nav{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;padding:4px;box-shadow:var(--shadow);overflow-x:auto}
+.nav a{flex:1 1 auto;text-align:center;white-space:nowrap;padding:8px 16px;
+  border-radius:7px;font-size:13.5px;font-weight:500;text-decoration:none;
+  color:var(--muted);transition:background .12s,color .12s}
+.nav a:hover{background:var(--surface-2);color:var(--ink)}
+.nav a.on{background:var(--accent);color:#fff}
+.nav a.on:hover{background:var(--accent);color:#fff}
+
+/* portfolio summary */
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);padding:22px 24px;display:flex;gap:28px;
+  align-items:flex-start;flex-wrap:wrap}
+.summary .big{display:flex;flex-direction:column;gap:3px;min-width:240px;flex:1 1 240px}
+.summary .big .v{font-size:38px;font-weight:600;letter-spacing:-.03em;line-height:1.1}
+.summary .sub{font-size:12.5px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+  gap:18px;flex:2 1 420px}
+.tile{display:flex;flex-direction:column;gap:2px}
+.tile .v{font-size:20px;font-weight:600;letter-spacing:-.02em}
+
+/* open position cards */
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
+.holding{border:1px solid var(--line);border-radius:10px;padding:13px 14px;
+  background:var(--surface-2);display:flex;flex-direction:column;gap:9px}
+.pos-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pos-top .sym{font-weight:600;font-size:15px;margin-right:7px}
+.pos-pnl{font-size:14px;font-weight:600;text-align:right}
+.pos-book{font-size:11px;color:var(--muted);margin-top:-6px}
+.spark{width:100%;height:76px;display:block}
+.spark-empty{height:76px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:6px}
+.rule{stroke-width:1;stroke-dasharray:3 3}
+.rule.sl{stroke:var(--neg)} .rule.tp{stroke:var(--pos)} .rule.en{stroke:var(--muted)}
+.pos-bar{height:4px;border-radius:100px;background:var(--neg);opacity:.25;overflow:hidden}
+.pos-bar-fill{height:100%;background:var(--pos);opacity:1}
+.pos-legs{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;
+  color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace}
+.pos-legs i.k{display:inline-block;width:7px;height:2px;margin-right:4px;
+  vertical-align:middle;border-radius:2px}
+.pos-legs i.sl{background:var(--neg)} .pos-legs i.tp{background:var(--pos)}
+.pos-legs i.en{background:var(--muted)}
+.pos-foot{display:flex;justify-content:space-between;align-items:center;
+  font-size:11.5px;padding-top:2px;border-top:1px solid var(--line)}
+.pos-foot a{color:var(--accent);text-decoration:none;font-weight:500}
+.pos-foot a:hover{text-decoration:underline}
+.ev{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;letter-spacing:.04em}
+.ev.entry{background:var(--surface-2);color:var(--accent);border:1px solid var(--line)}
+.ev.exit{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+
+#tv:empty{display:none}
+#bigchart{width:100%;height:320px;display:block}
+.chart-note{font-size:12px;color:var(--muted);margin-top:8px}
+#symsel{font:inherit;font-size:13px;padding:5px 9px;border-radius:7px;
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink)}
+
+/* cards */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+.card.s0{border-top:3px solid var(--s0)}
+.card.bench{border-top:3px solid var(--muted);border-style:dashed solid solid solid}
+.card-note{margin-top:10px;font-size:12px;line-height:1.5;color:var(--muted)}
+.card.s1{border-top:3px solid var(--s1)}
+.card.s2{border-top:3px solid var(--s2)}
+.card h3{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.swatch{width:9px;height:9px;border-radius:2px}
+.figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:14px}
+.fig{display:flex;flex-direction:column;gap:2px}
+.fig .v{font-size:21px;font-weight:600;letter-spacing:-.02em}
+.fig .v.sm{font-size:17px}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .mut{color:var(--muted)}
+
+/* sections */
+section{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);overflow:hidden}
+.sec-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;
+  justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.sec-head h2{font-size:15px;font-weight:600}
+.sec-body{padding:18px 20px}
+.legend{display:flex;gap:16px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.chart{width:100%;height:260px}
+.chart svg{width:100%;height:100%;display:block}
+.grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 5;opacity:.7}
+.baseline{stroke:var(--muted);stroke-width:1;stroke-dasharray:5 4;opacity:.55}
+.empty-chart{height:260px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;color:var(--muted);background:var(--surface-2);
+  border-radius:8px;border:1px dashed var(--line)}
+.empty-chart span{font-size:14px;font-weight:600}
+.empty-chart small{font-size:12.5px}
+
+/* tables */
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);padding:0 14px 9px;white-space:nowrap}
+td{padding:9px 14px;border-top:1px solid var(--line);white-space:nowrap}
+tbody tr:hover{background:var(--surface-2)}
+.tag{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;
+  border-radius:4px;letter-spacing:.03em}
+.tag.long{background:var(--pos-bg);color:var(--pos)}
+.tag.short{background:var(--neg-bg);color:var(--neg)}
+.tag.chop{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.tag.wait{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.empty-row{padding:26px 20px;text-align:center;color:var(--muted);font-size:13.5px}
+
+footer{color:var(--muted);font-size:12.5px;text-align:center;padding-top:6px;
+  max-width:70ch;margin:0 auto;line-height:1.6}
+@media (max-width:600px){
+  body{padding:20px 14px 48px} h1{font-size:24px}
+  .stamp{text-align:left;align-items:flex-start}
+}
+</style>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Bob</h1>
+      <p class="tagline">Every entry and exit the books have made, newest first.</p>
+    </div>
+    <div class="stamp">
+      <span class="pill live"><span class="dot"></span>Running</span>
+      <span class="lbl" id="built">Page built 31 Aug 2026 · 01:55 UTC</span>
+      <span class="lbl" id="pricedat"></span>
+    </div>
+  </header>
+  <nav class="nav"><a href="index.html">Portfolio</a><a href="orders.html" class='on'>Orders</a><a href="markets.html">Markets</a><a href="research.html">Research</a><a href="glossary.html">Glossary</a></nav>
+
+  <section>
+    <div class="sec-head"><h2>Recent orders</h2>
+      <span class="lbl">250 shown, newest first</span></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Time</th><th>Event</th><th>Market</th><th>Side</th>
+        <th>Price</th><th>Book</th><th>Reason</th><th>P&amp;L</th></tr></thead>
+      <tbody>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ESP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0801</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">AR</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2.0665</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">AERO</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4827</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">MSTRB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">127.8400</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ALLO</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.2449</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">HEMI</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0144</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ARB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0853</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">WLD</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3626</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-31 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ZEC</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">835.1718</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">FIL</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.6663</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+12.98</td></tr>
+        <tr><td class="num mut">2026-08-30 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">PYTH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0473</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-8.11</td></tr>
+        <tr><td class="num mut">2026-08-30 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">PYTH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0476</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-4.00</td></tr>
+        <tr><td class="num mut">2026-08-30 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BTC</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">78,215.7063</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-2.23</td></tr>
+        <tr><td class="num mut">2026-08-30 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BTC</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">78,215.7063</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-1.12</td></tr>
+        <tr><td class="num mut">2026-08-30 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">692.5923</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-1.23</td></tr>
+        <tr><td class="num mut">2026-08-30 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,470.7535</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.39</td></tr>
+        <tr><td class="num mut">2026-08-30 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BTC</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">78,425.9311</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.42</td></tr>
+        <tr><td class="num mut">2026-08-30 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ACE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.1755</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+31.07</td></tr>
+        <tr><td class="num mut">2026-08-30 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">AAVE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">124.7738</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.87</td></tr>
+        <tr><td class="num mut">2026-08-28 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TAO</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">236.3125</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-10.74</td></tr>
+        <tr><td class="num mut">2026-08-28 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TAO</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">238.9489</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-3.25</td></tr>
+        <tr><td class="num mut">2026-08-28 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SAHARA</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0083</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+1.05</td></tr>
+        <tr><td class="num mut">2026-08-28 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">EDEN</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0666</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-12.70</td></tr>
+        <tr><td class="num mut">2026-08-28 11:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">WBTC</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">79,531.2506</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.54</td></tr>
+        <tr><td class="num mut">2026-08-28 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">KITE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1267</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-2.11</td></tr>
+        <tr><td class="num mut">2026-08-28 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">KITE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1267</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.78</td></tr>
+        <tr><td class="num mut">2026-08-28 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">KITE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1267</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-4.33</td></tr>
+        <tr><td class="num mut">2026-08-28 18:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">CVX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2.2645</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.58</td></tr>
+        <tr><td class="num mut">2026-08-30 05:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SNDKB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1,496.3792</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-3.93</td></tr>
+        <tr><td class="num mut">2026-08-29 09:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SNDKB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1,484.6269</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.19</td></tr>
+        <tr><td class="num mut">2026-08-28 13:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SNDKB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1,486.0565</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-6.66</td></tr>
+        <tr><td class="num mut">2026-08-28 14:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SNDKB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1,504.5583</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-7.47</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BNSOL</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">119.8240</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.02</td></tr>
+        <tr><td class="num mut">2026-08-28 11:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">APE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.1406</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.11</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">APE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1406</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+1.77</td></tr>
+        <tr><td class="num mut">2026-08-29 17:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">GENIUS</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.2841</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.62</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">MSTRB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">133.4350</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-8.60</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ROBO</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0134</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-5.89</td></tr>
+        <tr><td class="num mut">2026-08-28 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ONT</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0554</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.95</td></tr>
+        <tr><td class="num mut">2026-08-28 11:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">MMT</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.1644</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+1.20</td></tr>
+        <tr><td class="num mut">2026-08-28 12:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BICO</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0234</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.79</td></tr>
+        <tr><td class="num mut">2026-08-30 04:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">STRK</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0264</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-9.00</td></tr>
+        <tr><td class="num mut">2026-08-28 11:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">HEI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1502</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-12.52</td></tr>
+        <tr><td class="num mut">2026-08-28 14:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">HEI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1427</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-12.51</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">CHIP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0425</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-5.07</td></tr>
+        <tr><td class="num mut">2026-08-30 07:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">JTO</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.4871</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+16.04</td></tr>
+        <tr><td class="num mut">2026-08-30 01:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">JTO</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.4922</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-7.56</td></tr>
+        <tr><td class="num mut">2026-08-29 09:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">JST</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.1000</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-2.44</td></tr>
+        <tr><td class="num mut">2026-08-28 22:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">JST</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0984</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-2.06</td></tr>
+        <tr><td class="num mut">2026-08-28 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">JST</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0986</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-1.94</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">PROM</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">5.4430</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+30.94</td></tr>
+        <tr><td class="num mut">2026-08-29 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">PROM</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">6.2664</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+30.83</td></tr>
+        <tr><td class="num mut">2026-08-29 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">PROM</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">6.4377</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+15.32</td></tr>
+        <tr><td class="num mut">2026-08-28 12:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">CAKE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.7407</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.81</td></tr>
+        <tr><td class="num mut">2026-08-28 14:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">CRCLB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">91.4183</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-8.69</td></tr>
+        <tr><td class="num mut">2026-08-28 13:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">CRCLB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">91.5321</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-6.57</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">GALA</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0018</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.38</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">GALA</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0018</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.38</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SEI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0468</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-7.53</td></tr>
+        <tr><td class="num mut">2026-08-28 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">WIF</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.2067</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-12.85</td></tr>
+        <tr><td class="num mut">2026-08-29 08:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">OP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0883</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+22.72</td></tr>
+        <tr><td class="num mut">2026-08-28 15:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">COTI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0123</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-5.01</td></tr>
+        <tr><td class="num mut">2026-08-28 15:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">GIGGLE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">36.4927</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+3.07</td></tr>
+        <tr><td class="num mut">2026-08-28 15:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">GIGGLE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">36.4927</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+3.02</td></tr>
+        <tr><td class="num mut">2026-08-28 15:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">GIGGLE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">36.4927</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+4.26</td></tr>
+        <tr><td class="num mut">2026-08-29 19:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">HEMI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0119</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+6.37</td></tr>
+        <tr><td class="num mut">2026-08-29 19:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">HEMI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0119</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+5.90</td></tr>
+        <tr><td class="num mut">2026-08-29 19:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">HEMI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0119</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+10.27</td></tr>
+        <tr><td class="num mut">2026-08-28 18:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">MUBARAK</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0209</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+4.75</td></tr>
+        <tr><td class="num mut">2026-08-28 18:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">MUBARAK</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0209</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.95</td></tr>
+        <tr><td class="num mut">2026-08-30 03:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">XPL</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0869</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.25</td></tr>
+        <tr><td class="num mut">2026-08-30 02:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">XPL</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0877</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 13:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">U</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.9999</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 19:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">POL</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0996</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 19:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ONDO</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3579</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.62</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ONDO</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3623</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 17:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">DASH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">42.3385</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 21:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">AVAX</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">7.3345</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 20:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">AVAX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">7.3440</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-1.87</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">AVAX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">7.4485</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 12:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">AAVE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">126.5453</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">AAVE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">125.2350</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-3.58</td></tr>
+        <tr><td class="num mut">2026-08-30 09:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">AAVE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">123.5853</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 07:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">AAVE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">124.0952</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-3.56</td></tr>
+        <tr><td class="num mut">2026-08-30 02:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">AAVE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">125.7651</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 21:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">LTC</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">49.1302</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 20:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">LTC</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">49.3996</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-3.39</td></tr>
+        <tr><td class="num mut">2026-08-30 15:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">LTC</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">50.0300</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">LTC</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">48.9298</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.03</td></tr>
+        <tr><td class="num mut">2026-08-28 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">UNI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">4.3554</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-9.69</td></tr>
+        <tr><td class="num mut">2026-08-30 13:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">UNI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">5.2320</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 13:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">UNI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">5.3210</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+22.63</td></tr>
+        <tr><td class="num mut">2026-08-30 02:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">UNI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">4.8730</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 01:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">UNI</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">4.4379</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.57</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">UNI</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">4.4221</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-28 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">UNI</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">4.4547</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-4.79</td></tr>
+        <tr><td class="num mut">2026-08-30 19:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">WLD</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3841</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.39</td></tr>
+        <tr><td class="num mut">2026-08-30 18:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">WLD</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3881</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 17:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">WLD</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.3887</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-6.33</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">WLD</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.3794</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 09:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">RLUSD</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.0001</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.42</td></tr>
+        <tr><td class="num mut">2026-08-29 19:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">RLUSD</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.0008</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 01:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">XLM</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.1791</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.49</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">XLM</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.1790</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 06:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TUT</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0368</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+9.60</td></tr>
+        <tr><td class="num mut">2026-08-30 03:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3401</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.06</td></tr>
+        <tr><td class="num mut">2026-08-29 20:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3399</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 19:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.3394</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.01</td></tr>
+        <tr><td class="num mut">2026-08-29 06:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.3383</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 03:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3401</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.43</td></tr>
+        <tr><td class="num mut">2026-08-29 23:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3410</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 18:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3388</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.06</td></tr>
+        <tr><td class="num mut">2026-08-29 17:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.3387</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRX</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.3407</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.45</td></tr>
+        <tr><td class="num mut">2026-08-28 13:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">LINK</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">11.7526</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.22</td></tr>
+        <tr><td class="num mut">2026-08-30 20:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">LINK</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">11.5491</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-4.62</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">LINK</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">11.7554</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 01:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">LINK</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">11.3933</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.63</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">LINK</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">11.4337</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 01:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">LINK</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">11.3933</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.81</td></tr>
+        <tr><td class="num mut">2026-08-29 06:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">LINK</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">11.3307</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 21:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ADA</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.2002</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 17:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ADA</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.2049</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.68</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ADA</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.2060</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 08:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ADA</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.2006</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+2.24</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ADA</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.2027</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 08:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ADA</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.2006</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.10</td></tr>
+        <tr><td class="num mut">2026-08-29 09:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ADA</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.2000</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 09:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.5005</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-2.26</td></tr>
+        <tr><td class="num mut">2026-08-29 08:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.4965</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 04:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4989</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.05</td></tr>
+        <tr><td class="num mut">2026-08-30 03:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4986</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 01:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4846</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.46</td></tr>
+        <tr><td class="num mut">2026-08-30 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4899</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 19:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4931</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.05</td></tr>
+        <tr><td class="num mut">2026-08-29 18:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4928</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 14:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4941</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.40</td></tr>
+        <tr><td class="num mut">2026-08-29 13:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">RE</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.4944</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 12:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">PUMP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0049</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.37</td></tr>
+        <tr><td class="num mut">2026-08-29 20:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">PUMP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0048</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 12:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">PUMP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0049</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-6.71</td></tr>
+        <tr><td class="num mut">2026-08-29 22:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">PUMP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0050</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-28 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ENA</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1588</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-4.76</td></tr>
+        <tr><td class="num mut">2026-08-28 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ENA</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1588</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-5.43</td></tr>
+        <tr><td class="num mut">2026-08-28 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ENA</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.1588</td>
+        <td class="mut">Control 1</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.30</td></tr>
+        <tr><td class="num mut">2026-08-29 17:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SUI</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.7426</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.58</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">SUI</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.7417</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 17:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SUI</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.7426</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.84</td></tr>
+        <tr><td class="num mut">2026-08-29 13:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">SUI</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.7380</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 13:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0857</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-3.62</td></tr>
+        <tr><td class="num mut">2026-08-30 08:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0846</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 02:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0851</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.02</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0852</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 13:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0857</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-3.54</td></tr>
+        <tr><td class="num mut">2026-08-30 09:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0846</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 02:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0851</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.26</td></tr>
+        <tr><td class="num mut">2026-08-29 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0852</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 02:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0851</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.64</td></tr>
+        <tr><td class="num mut">2026-08-29 14:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">DOGE</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0856</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 14:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">698.7897</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 04:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">693.8387</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.37</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">690.7518</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">703.8707</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.88</td></tr>
+        <tr><td class="num mut">2026-08-30 15:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">699.2701</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 04:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">693.8387</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.39</td></tr>
+        <tr><td class="num mut">2026-08-29 18:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">693.4413</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">693.6739</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-1.44</td></tr>
+        <tr><td class="num mut">2026-08-30 17:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">701.0702</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 04:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">693.8387</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.18</td></tr>
+        <tr><td class="num mut">2026-08-29 07:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">BNB</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">688.0224</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 15:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">PYTH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0488</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">PYTH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">0.0491</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 12:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">PYTH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0476</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-4.63</td></tr>
+        <tr><td class="num mut">2026-08-29 09:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">PYTH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">0.0468</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2.5835</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-2.22</td></tr>
+        <tr><td class="num mut">2026-08-30 13:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2.5595</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 12:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2.5835</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-4.43</td></tr>
+        <tr><td class="num mut">2026-08-30 11:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2.5325</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 11:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2.7295</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+4.94</td></tr>
+        <tr><td class="num mut">2026-08-29 11:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2.7295</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.89</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2.5835</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.30</td></tr>
+        <tr><td class="num mut">2026-08-30 12:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2.5825</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 11:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2.7295</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.89</td></tr>
+        <tr><td class="num mut">2026-08-29 08:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">TRUMP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2.7485</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ZEC</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">835.2870</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 21:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ZEC</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">838.2776</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 18:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ZEC</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">834.4068</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.35</td></tr>
+        <tr><td class="num mut">2026-08-29 17:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ZEC</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">836.4127</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 00:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">105.2289</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.03</td></tr>
+        <tr><td class="num mut">2026-08-29 18:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">105.1510</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-28 18:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">102.3148</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-9.08</td></tr>
+        <tr><td class="num mut">2026-08-29 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">104.8490</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.78</td></tr>
+        <tr><td class="num mut">2026-08-29 14:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">105.4011</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-28 10:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">104.7301</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-4.73</td></tr>
+        <tr><td class="num mut">2026-08-28 14:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">106.3313</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.51</td></tr>
+        <tr><td class="num mut">2026-08-28 13:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">105.1590</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 12:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">103.6407</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.64</td></tr>
+        <tr><td class="num mut">2026-08-29 11:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">SOL</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">103.4793</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 20:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.3971</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-2.38</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.4229</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 05:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1.3963</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-2.09</td></tr>
+        <tr><td class="num mut">2026-08-29 04:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1.3860</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1.3967</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-2.74</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1.3829</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1.3967</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.46</td></tr>
+        <tr><td class="num mut">2026-08-29 15:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">1.3929</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 13:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.3866</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.02</td></tr>
+        <tr><td class="num mut">2026-08-29 12:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.3850</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 09:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.3836</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.10</td></tr>
+        <tr><td class="num mut">2026-08-29 08:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">XRP</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">1.3834</td>
+        <td class="mut">Control 2</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,470.4379</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-3.81</td></tr>
+        <tr><td class="num mut">2026-08-30 17:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,506.2311</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 17:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,497.9872</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-3.38</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,529.7859</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,521.4879</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+4.95</td></tr>
+        <tr><td class="num mut">2026-08-30 12:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,469.9639</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 06:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,461.5622</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-3.68</td></tr>
+        <tr><td class="num mut">2026-08-28 18:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,428.1943</td>
+        <td class="mut">V2 Stoch+MFI</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,470.4379</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-3.82</td></tr>
+        <tr><td class="num mut">2026-08-30 17:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,506.2311</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 17:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,497.9872</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-3.39</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,529.7859</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,521.4879</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">take-profit</td>
+        <td class="num pos">+2.48</td></tr>
+        <tr><td class="num mut">2026-08-30 12:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,469.9639</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 07:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,454.7889</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.47</td></tr>
+        <tr><td class="num mut">2026-08-30 06:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,461.5622</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,458.1615</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.91</td></tr>
+        <tr><td class="num mut">2026-08-29 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,441.9815</td>
+        <td class="mut">V1 RSI+MACD</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 14:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,477.6154</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.25</td></tr>
+        <tr><td class="num mut">2026-08-30 13:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,475.0949</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 06:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,461.5622</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.82</td></tr>
+        <tr><td class="num mut">2026-08-30 05:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,455.8687</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 03:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,456.6586</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.13</td></tr>
+        <tr><td class="num mut">2026-08-30 02:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,455.4610</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,458.1615</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-2.51</td></tr>
+        <tr><td class="num mut">2026-08-29 07:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,435.9227</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 04:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,439.9619</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num pos">+0.18</td></tr>
+        <tr><td class="num mut">2026-08-29 03:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,435.7170</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-28 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,424.4150</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.62</td></tr>
+        <tr><td class="num mut">2026-08-28 20:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,428.0955</td>
+        <td class="mut">Control 5</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 07:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,454.7889</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.23</td></tr>
+        <tr><td class="num mut">2026-08-30 05:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,456.8513</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-29 23:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,458.1615</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-1.32</td></tr>
+        <tr><td class="num mut">2026-08-29 06:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,434.6730</td>
+        <td class="mut">Control 4</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 21:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,474.1284</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-1.93</td></tr>
+        <tr><td class="num mut">2026-08-30 18:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag long">long</span></td>
+        <td class="num">2,511.1421</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 16:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,504.1096</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">stop-loss</td>
+        <td class="num neg">-1.29</td></tr>
+        <tr><td class="num mut">2026-08-30 15:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,480.6138</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr>
+        <tr><td class="num mut">2026-08-30 06:59</td>
+        <td><span class="ev exit">EXIT</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,461.5622</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">signal-flatten</td>
+        <td class="num neg">-0.28</td></tr>
+        <tr><td class="num mut">2026-08-30 00:59</td>
+        <td><span class="ev entry">ENTRY</span></td>
+        <td class="num">ETH</td>
+        <td><span class="tag short">short</span></td>
+        <td class="num">2,458.4582</td>
+        <td class="mut">Control 3</td>
+        <td class="mut">—</td>
+        <td class="num mut">—</td></tr></tbody></table></div>
+  </section>
+  <footer>Simulated trading only &mdash; no orders are placed and no real money is
+    at risk. Each strategy runs one $10,000.00 account across
+    142 markets on 1h candles, risking 0.125% of
+    equity per position (capped at 1/40 notional, max
+    20 per side) behind a 2.5&times; ATR stop with a
+    2.5R target. The book halts for 24h after
+    6 consecutive losses or a 15% drawdown.</footer>
+</div>
+
+  <script>
+  (function () {
+    const CASH = 19963.9845;
+    const cards = [...document.querySelectorAll('.holding[data-sym]')];
+    // Ask for the held symbols only. The unfiltered endpoint returns ~3,700
+    // symbols and 150KB; every five seconds that is 100MB an hour down someone's
+    // phone to read a dozen prices.
+    const syms = [...new Set(cards.map(c => c.dataset.sym))];
+    const URL_ = 'https://data-api.binance.vision/api/v3/ticker/price?symbols='
+      + encodeURIComponent(JSON.stringify(syms));
+    const nw = document.querySelector('.js-networth');
+    const un = document.querySelector('.js-unreal');
+    const money = n => (n < 0 ? '-' : '') + '$' +
+      Math.abs(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const signed = n => (n >= 0 ? '+' : '') +
+      n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const klass = (el, n) => {
+      el.classList.remove('pos', 'neg');
+      el.classList.add(n >= 0 ? 'pos' : 'neg');
+    };
+
+    async function tick() {
+      let map;
+      try {
+        const r = await fetch(URL_);
+        if (!r.ok) throw new Error(r.status);
+        map = new Map((await r.json()).map(x => [x.symbol, parseFloat(x.price)]));
+      } catch (e) { return false; }
+
+      let unreal = 0;
+      for (const c of cards) {
+        const px = map.get(c.dataset.sym);
+        if (!px) continue;
+        const entry = parseFloat(c.dataset.entry), qty = parseFloat(c.dataset.qty);
+        const d = c.dataset.side === 'long' ? px - entry : entry - px;
+        const pnl = d * qty;
+        unreal += pnl;
+        const el = c.querySelector('.js-pnl');
+        if (el) {
+          el.firstChild.nodeValue = signed(pnl) + ' ';
+          const pct = el.querySelector('span');
+          if (pct) pct.textContent = signed(d / entry * 100) + '%';
+          klass(el, pnl);
+        }
+        const now = c.querySelector('.js-now');
+        if (now) now.textContent = 'Now ' + px.toLocaleString('en-US',
+          {minimumFractionDigits: 4, maximumFractionDigits: 4});
+      }
+      if (un) { un.textContent = money(unreal); klass(un, unreal); }
+      if (nw) nw.textContent = money(CASH + unreal);
+      const stamp = document.getElementById('pricedat');
+      if (stamp) stamp.textContent = 'Prices ' +
+        new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit',
+                                           second: '2-digit'});
+      return true;
+    }
+
+    // GitHub Pages serves cache-control: max-age=600, so a browser will happily
+    // show a ten-minute-old page and never ask for a newer one -- stacked on
+    // Bob's ten-minute render that is up to twenty minutes stale. Poll the page
+    // itself past the cache and reload only when the build stamp has actually
+    // moved, so nothing flickers when there is nothing new.
+    const BUILT = (document.getElementById('built') || {}).textContent || '';
+    async function checkBuild() {
+      try {
+        const r = await fetch(location.pathname + '?_=' + Date.now(),
+                              {cache: 'no-store'});
+        if (!r.ok) return;
+        const t = (await r.text()).match(/id="built"[^>]*>([^<]*)</);
+        if (t && t[1] && t[1] !== BUILT) location.reload();
+      } catch (e) { /* offline or blocked: keep showing what we have */ }
+    }
+
+    // Always on: it is the only thing that gets a new build past the cache,
+    // and it must survive a blocked price feed and an empty book alike.
+    setInterval(checkBuild, 60000);
+
+    if (cards.length) {
+      tick().then(ok => {
+        if (!ok) return;          // host blocks the fetch: keep what was rendered
+        const pill = document.querySelector('.pill');
+        if (pill) pill.lastChild.nodeValue = 'Live prices';
+        setInterval(tick, 5000);
+      });
+    }
+  })();
+  </script>
+

@@ -1,0 +1,1237 @@
+<title>Bob · Markets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#EDF0F2; --surface:#FFFFFF; --surface-2:#F6F8F9;
+  --ink:#10161C; --muted:#5C6B78; --line:#D4DBE0;
+  --accent:#2E5EAA; --s0:#8A8F98; --s1:#B4531F; --s2:#0F7A6C;
+  --pos:#1B7A3E; --neg:#B3261E; --warn:#8A6410;
+  --pos-bg:#E6F2EA; --neg-bg:#FBE9E7; --warn-bg:#FBF2DF;
+  --shadow:0 1px 2px rgba(16,22,28,.06),0 8px 24px rgba(16,22,28,.05);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1418; --surface:#131C22; --surface-2:#18242B;
+    --ink:#E4EBEF; --muted:#8798A5; --line:#233039;
+    --accent:#6E9BE8; --s0:#7E838C; --s1:#E08040; --s2:#35B8A5;
+    --pos:#3DBE6E; --neg:#E4574C; --warn:#D6A93C;
+    --pos-bg:#12271B; --neg-bg:#2A1614; --warn-bg:#251E0E;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1418; --surface:#131C22; --surface-2:#18242B;
+  --ink:#E4EBEF; --muted:#8798A5; --line:#233039;
+  --accent:#6E9BE8; --s0:#7E838C; --s1:#E08040; --s2:#35B8A5;
+  --pos:#3DBE6E; --neg:#E4574C; --warn:#D6A93C;
+  --pos-bg:#12271B; --neg-bg:#2A1614; --warn-bg:#251E0E;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  padding:32px 20px 64px;
+}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.num{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums}
+.lbl{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted)}
+
+/* header */
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
+  flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--line)}
+h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:30px;font-weight:600;
+  letter-spacing:-.015em;text-wrap:balance}
+.tagline{color:var(--muted);font-size:13.5px;margin-top:3px;max-width:62ch}
+.stamp{text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+  padding:4px 10px;border-radius:100px;border:1px solid transparent}
+.pill.live{background:var(--pos-bg);color:var(--pos);border-color:currentColor}
+.pill.stale{background:var(--warn-bg);color:var(--warn);border-color:currentColor}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+/* verdict */
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:20px 22px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+.verdict-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.verdict-head h2{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.verdict p{color:var(--muted);font-size:13.5px;max-width:78ch}
+.meter{display:flex;flex-direction:column;gap:7px}
+.meter-track{height:7px;border-radius:100px;background:var(--surface-2);
+  border:1px solid var(--line);overflow:hidden;display:flex}
+.meter-fill{background:var(--accent);height:100%}
+.meter-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+
+/* glossary */
+.glossary{display:flex;flex-direction:column}
+.gl{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:20px;
+  padding:13px 0;border-top:1px solid var(--line)}
+.gl:first-child{border-top:0;padding-top:0}
+.gl dt{font-weight:600;font-size:13.5px}
+.gl dd{color:var(--muted);font-size:13.5px;max-width:76ch}
+.gl dd em{font-style:normal;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:12.5px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+@media (max-width:640px){.gl{grid-template-columns:1fr;gap:4px}}
+
+/* nav */
+.nav{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;padding:4px;box-shadow:var(--shadow);overflow-x:auto}
+.nav a{flex:1 1 auto;text-align:center;white-space:nowrap;padding:8px 16px;
+  border-radius:7px;font-size:13.5px;font-weight:500;text-decoration:none;
+  color:var(--muted);transition:background .12s,color .12s}
+.nav a:hover{background:var(--surface-2);color:var(--ink)}
+.nav a.on{background:var(--accent);color:#fff}
+.nav a.on:hover{background:var(--accent);color:#fff}
+
+/* portfolio summary */
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);padding:22px 24px;display:flex;gap:28px;
+  align-items:flex-start;flex-wrap:wrap}
+.summary .big{display:flex;flex-direction:column;gap:3px;min-width:240px;flex:1 1 240px}
+.summary .big .v{font-size:38px;font-weight:600;letter-spacing:-.03em;line-height:1.1}
+.summary .sub{font-size:12.5px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+  gap:18px;flex:2 1 420px}
+.tile{display:flex;flex-direction:column;gap:2px}
+.tile .v{font-size:20px;font-weight:600;letter-spacing:-.02em}
+
+/* open position cards */
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
+.holding{border:1px solid var(--line);border-radius:10px;padding:13px 14px;
+  background:var(--surface-2);display:flex;flex-direction:column;gap:9px}
+.pos-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pos-top .sym{font-weight:600;font-size:15px;margin-right:7px}
+.pos-pnl{font-size:14px;font-weight:600;text-align:right}
+.pos-book{font-size:11px;color:var(--muted);margin-top:-6px}
+.spark{width:100%;height:76px;display:block}
+.spark-empty{height:76px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:6px}
+.rule{stroke-width:1;stroke-dasharray:3 3}
+.rule.sl{stroke:var(--neg)} .rule.tp{stroke:var(--pos)} .rule.en{stroke:var(--muted)}
+.pos-bar{height:4px;border-radius:100px;background:var(--neg);opacity:.25;overflow:hidden}
+.pos-bar-fill{height:100%;background:var(--pos);opacity:1}
+.pos-legs{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;
+  color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace}
+.pos-legs i.k{display:inline-block;width:7px;height:2px;margin-right:4px;
+  vertical-align:middle;border-radius:2px}
+.pos-legs i.sl{background:var(--neg)} .pos-legs i.tp{background:var(--pos)}
+.pos-legs i.en{background:var(--muted)}
+.pos-foot{display:flex;justify-content:space-between;align-items:center;
+  font-size:11.5px;padding-top:2px;border-top:1px solid var(--line)}
+.pos-foot a{color:var(--accent);text-decoration:none;font-weight:500}
+.pos-foot a:hover{text-decoration:underline}
+.ev{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;letter-spacing:.04em}
+.ev.entry{background:var(--surface-2);color:var(--accent);border:1px solid var(--line)}
+.ev.exit{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+
+#tv:empty{display:none}
+#bigchart{width:100%;height:320px;display:block}
+.chart-note{font-size:12px;color:var(--muted);margin-top:8px}
+#symsel{font:inherit;font-size:13px;padding:5px 9px;border-radius:7px;
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink)}
+
+/* cards */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+.card.s0{border-top:3px solid var(--s0)}
+.card.bench{border-top:3px solid var(--muted);border-style:dashed solid solid solid}
+.card-note{margin-top:10px;font-size:12px;line-height:1.5;color:var(--muted)}
+.card.s1{border-top:3px solid var(--s1)}
+.card.s2{border-top:3px solid var(--s2)}
+.card h3{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.swatch{width:9px;height:9px;border-radius:2px}
+.figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:14px}
+.fig{display:flex;flex-direction:column;gap:2px}
+.fig .v{font-size:21px;font-weight:600;letter-spacing:-.02em}
+.fig .v.sm{font-size:17px}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .mut{color:var(--muted)}
+
+/* sections */
+section{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);overflow:hidden}
+.sec-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;
+  justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.sec-head h2{font-size:15px;font-weight:600}
+.sec-body{padding:18px 20px}
+.legend{display:flex;gap:16px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.chart{width:100%;height:260px}
+.chart svg{width:100%;height:100%;display:block}
+.grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 5;opacity:.7}
+.baseline{stroke:var(--muted);stroke-width:1;stroke-dasharray:5 4;opacity:.55}
+.empty-chart{height:260px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;color:var(--muted);background:var(--surface-2);
+  border-radius:8px;border:1px dashed var(--line)}
+.empty-chart span{font-size:14px;font-weight:600}
+.empty-chart small{font-size:12.5px}
+
+/* tables */
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);padding:0 14px 9px;white-space:nowrap}
+td{padding:9px 14px;border-top:1px solid var(--line);white-space:nowrap}
+tbody tr:hover{background:var(--surface-2)}
+.tag{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;
+  border-radius:4px;letter-spacing:.03em}
+.tag.long{background:var(--pos-bg);color:var(--pos)}
+.tag.short{background:var(--neg-bg);color:var(--neg)}
+.tag.chop{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.tag.wait{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.empty-row{padding:26px 20px;text-align:center;color:var(--muted);font-size:13.5px}
+
+footer{color:var(--muted);font-size:12.5px;text-align:center;padding-top:6px;
+  max-width:70ch;margin:0 auto;line-height:1.6}
+@media (max-width:600px){
+  body{padding:20px 14px 48px} h1{font-size:24px}
+  .stamp{text-align:left;align-items:flex-start}
+}
+</style>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Bob</h1>
+      <p class="tagline">Price charts and what each strategy currently reads in all 142 markets.</p>
+    </div>
+    <div class="stamp">
+      <span class="pill live"><span class="dot"></span>Running</span>
+      <span class="lbl" id="built">Page built 31 Aug 2026 · 01:55 UTC</span>
+      <span class="lbl" id="pricedat"></span>
+    </div>
+  </header>
+  <nav class="nav"><a href="index.html">Portfolio</a><a href="orders.html">Orders</a><a href="markets.html" class='on'>Markets</a><a href="research.html">Research</a><a href="glossary.html">Glossary</a></nav>
+
+  <section>
+    <div class="sec-head"><h2>Market chart</h2>
+      <select id="symsel" aria-label="Choose a market"><option value="ADAUSDT">ADA</option><option value="AVAXUSDT">AVAX</option><option value="DASHUSDT">DASH</option><option value="LTCUSDT">LTC</option><option value="POLUSDT">POL</option><option value="UNIUSDT">UNI</option><option value="UUSDT">U</option><option value="ZECUSDT">ZEC</option></select></div>
+    <div class="sec-body">
+      <div id="tv"></div>
+      <div id="fallback"><svg id="bigchart" viewBox="0 0 900 320"
+        preserveAspectRatio="none" role="img" aria-label="Price history"></svg>
+        <p class="chart-note" id="cnote">Drawn from the same Binance hourly candles
+          the books trade on.</p></div>
+    </div>
+  </section>
+  <section>
+    <div class="sec-head"><h2>What each strategy sees right now</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Market</th><th>Price</th><th>Trend</th><th>RSI</th><th>Stoch</th>
+        <th>MFI</th><th>ADX</th>
+        <th>V1</th><th>V2</th><th>Control 1</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="num">BTC</td>
+        <td class="num">77,937</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">41</td><td class="num">33</td>
+        <td class="num">42</td><td class="num">28</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ETH</td>
+        <td class="num">2,428.25</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">23</td>
+        <td class="num">45</td><td class="num">38</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">XRP</td>
+        <td class="num">1.3652</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">21</td>
+        <td class="num">44</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">SOL</td>
+        <td class="num">102.14</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">31</td><td class="num">19</td>
+        <td class="num">39</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ZEC</td>
+        <td class="num">835.13</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">44</td><td class="num">33</td>
+        <td class="num">56</td><td class="num">37</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag long">long</span></td></tr>
+        <tr><td class="num">TRUMP</td>
+        <td class="num">2.377</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">30</td><td class="num">24</td>
+        <td class="num">26</td><td class="num">27</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">PYTH</td>
+        <td class="num">0.04714</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">41</td><td class="num">33</td>
+        <td class="num">52</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BNB</td>
+        <td class="num">686.28</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">35</td><td class="num">23</td>
+        <td class="num">49</td><td class="num">27</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">DOGE</td>
+        <td class="num">0.08241</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">30</td><td class="num">21</td>
+        <td class="num">29</td><td class="num">26</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SUI</td>
+        <td class="num">0.7172</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">21</td>
+        <td class="num">42</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ENA</td>
+        <td class="num">0.1489</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">11</td>
+        <td class="num">38</td><td class="num">20</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">PUMP</td>
+        <td class="num">0.00449</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">30</td><td class="num">17</td>
+        <td class="num">24</td><td class="num">22</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">RE</td>
+        <td class="num">0.4701</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">29</td>
+        <td class="num">19</td><td class="num">26</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ADA</td>
+        <td class="num">0.1941</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">31</td><td class="num">20</td>
+        <td class="num">35</td><td class="num">28</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">NEAR</td>
+        <td class="num">1.869</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">49</td><td class="num">34</td>
+        <td class="num">45</td><td class="num">34</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">LINK</td>
+        <td class="num">11.189</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">22</td>
+        <td class="num">50</td><td class="num">27</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">TRX</td>
+        <td class="num">0.3359</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">23</td><td class="num">4</td>
+        <td class="num">25</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">TUT</td>
+        <td class="num">0.035</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">42</td><td class="num">18</td>
+        <td class="num">56</td><td class="num">9</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag chop">chop</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">XLM</td>
+        <td class="num">0.1756</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">23</td>
+        <td class="num">25</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">RLUSD</td>
+        <td class="num">1.0003</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">46</td><td class="num">50</td>
+        <td class="num">72</td><td class="num">18</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">WLD</td>
+        <td class="num">0.3626</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">18</td>
+        <td class="num">54</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag long">long</span></td></tr>
+        <tr><td class="num">UNI</td>
+        <td class="num">5.151</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">56</td><td class="num">50</td>
+        <td class="num">69</td><td class="num">49</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">LTC</td>
+        <td class="num">48.33</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">35</td><td class="num">21</td>
+        <td class="num">56</td><td class="num">29</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">TAO</td>
+        <td class="num">228.5</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">19</td>
+        <td class="num">21</td><td class="num">20</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">AAVE</td>
+        <td class="num">123.71</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">42</td><td class="num">23</td>
+        <td class="num">54</td><td class="num">30</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">AVAX</td>
+        <td class="num">7.152</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">31</td><td class="num">25</td>
+        <td class="num">26</td><td class="num">26</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">DASH</td>
+        <td class="num">41.88</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">50</td><td class="num">46</td>
+        <td class="num">62</td><td class="num">25</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ONDO</td>
+        <td class="num">0.3468</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">38</td><td class="num">21</td>
+        <td class="num">36</td><td class="num">22</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">POL</td>
+        <td class="num">0.0966</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">28</td><td class="num">8</td>
+        <td class="num">28</td><td class="num">32</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">U</td>
+        <td class="num">0.9996</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">49</td><td class="num">44</td>
+        <td class="num">67</td><td class="num">89</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">XPL</td>
+        <td class="num">0.08548</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">42</td><td class="num">23</td>
+        <td class="num">48</td><td class="num">35</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ACE</td>
+        <td class="num">0.1709</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">17</td><td class="num">10</td>
+        <td class="num">14</td><td class="num">28</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ZAMA</td>
+        <td class="num">0.05098</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">39</td><td class="num">29</td>
+        <td class="num">46</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BCH</td>
+        <td class="num">244.6</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">39</td><td class="num">31</td>
+        <td class="num">47</td><td class="num">34</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">PENGU</td>
+        <td class="num">0.008694</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">14</td>
+        <td class="num">41</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">HBAR</td>
+        <td class="num">0.0739</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">17</td>
+        <td class="num">40</td><td class="num">25</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">FET</td>
+        <td class="num">0.15</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">43</td><td class="num">19</td>
+        <td class="num">47</td><td class="num">25</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">GRAM</td>
+        <td class="num">1.341</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">35</td><td class="num">22</td>
+        <td class="num">42</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ARB</td>
+        <td class="num">0.0852</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">30</td>
+        <td class="num">39</td><td class="num">28</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag long">long</span></td></tr>
+        <tr><td class="num">FIL</td>
+        <td class="num">0.6669</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">30</td>
+        <td class="num">39</td><td class="num">26</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">DOT</td>
+        <td class="num">0.823</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">35</td><td class="num">20</td>
+        <td class="num">32</td><td class="num">25</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ICP</td>
+        <td class="num">2.378</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">20</td>
+        <td class="num">31</td><td class="num">22</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">MUBARAK</td>
+        <td class="num">0.02166</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">52</td><td class="num">46</td>
+        <td class="num">54</td><td class="num">15</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag chop">chop</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">ZEN</td>
+        <td class="num">5.432</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">59</td><td class="num">61</td>
+        <td class="num">77</td><td class="num">33</td>
+        <td><span class="tag long">long</span></td><td><span class="tag long">long</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">INJ</td>
+        <td class="num">4.985</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">30</td><td class="num">12</td>
+        <td class="num">31</td><td class="num">30</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">CRV</td>
+        <td class="num">0.3025</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">49</td><td class="num">31</td>
+        <td class="num">50</td><td class="num">26</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ZRO</td>
+        <td class="num">1.033</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">18</td>
+        <td class="num">25</td><td class="num">16</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">ETC</td>
+        <td class="num">7.23</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">29</td>
+        <td class="num">33</td><td class="num">30</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">PORTAL</td>
+        <td class="num">0.01519</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">46</td><td class="num">45</td>
+        <td class="num">35</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">HEMI</td>
+        <td class="num">0.01437</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">69</td><td class="num">87</td>
+        <td class="num">59</td><td class="num">26</td>
+        <td><span class="tag long">long</span></td><td><span class="tag long">long</span></td><td><span class="tag short">short</span></td></tr>
+        <tr><td class="num">GIGGLE</td>
+        <td class="num">38.93</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">47</td><td class="num">44</td>
+        <td class="num">52</td><td class="num">17</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">ETHFI</td>
+        <td class="num">0.5346</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">44</td><td class="num">34</td>
+        <td class="num">40</td><td class="num">22</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">VIRTUAL</td>
+        <td class="num">0.6732</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">18</td>
+        <td class="num">34</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">XAUT</td>
+        <td class="num">4,446.12</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">27</td><td class="num">62</td>
+        <td class="num">60</td><td class="num">47</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">COTI</td>
+        <td class="num">0.01303</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">47</td><td class="num">46</td>
+        <td class="num">53</td><td class="num">22</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ONG</td>
+        <td class="num">0.10749</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">27</td>
+        <td class="num">42</td><td class="num">30</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">NEIRO</td>
+        <td class="num">8.27e-05</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">27</td>
+        <td class="num">25</td><td class="num">20</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BOME</td>
+        <td class="num">0.0009227</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">31</td><td class="num">21</td>
+        <td class="num">34</td><td class="num">41</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">TRB</td>
+        <td class="num">16.93</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">46</td><td class="num">37</td>
+        <td class="num">46</td><td class="num">24</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">OP</td>
+        <td class="num">0.0876</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">41</td><td class="num">47</td>
+        <td class="num">45</td><td class="num">29</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ORDI</td>
+        <td class="num">3.853</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">25</td>
+        <td class="num">21</td><td class="num">26</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">KAITO</td>
+        <td class="num">0.3007</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">29</td><td class="num">30</td>
+        <td class="num">14</td><td class="num">40</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">PAXG</td>
+        <td class="num">4,454.8</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">31</td><td class="num">50</td>
+        <td class="num">30</td><td class="num">25</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">WIF</td>
+        <td class="num">0.1919</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">20</td>
+        <td class="num">28</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">STX</td>
+        <td class="num">0.2418</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">47</td><td class="num">23</td>
+        <td class="num">53</td><td class="num">17</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">SEI</td>
+        <td class="num">0.0442</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">21</td>
+        <td class="num">17</td><td class="num">27</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">DEXE</td>
+        <td class="num">2.118</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">11</td>
+        <td class="num">27</td><td class="num">21</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">GALA</td>
+        <td class="num">0.001673</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">23</td>
+        <td class="num">17</td><td class="num">21</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">FLOKI</td>
+        <td class="num">2.409e-05</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">28</td><td class="num">16</td>
+        <td class="num">22</td><td class="num">30</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">RENDER</td>
+        <td class="num">1.402</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">17</td>
+        <td class="num">19</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SPCXB</td>
+        <td class="num">141.01</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">56</td><td class="num">45</td>
+        <td class="num">51</td><td class="num">18</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">GPS</td>
+        <td class="num">0.00976</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">65</td><td class="num">73</td>
+        <td class="num">50</td><td class="num">13</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag chop">chop</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">LDO</td>
+        <td class="num">0.3551</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">41</td><td class="num">21</td>
+        <td class="num">50</td><td class="num">27</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">TIA</td>
+        <td class="num">0.3283</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">22</td>
+        <td class="num">38</td><td class="num">26</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BIO</td>
+        <td class="num">0.02639</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">27</td>
+        <td class="num">30</td><td class="num">36</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">PLUME</td>
+        <td class="num">0.01444</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">47</td><td class="num">33</td>
+        <td class="num">54</td><td class="num">27</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">CRCLB</td>
+        <td class="num">87</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">32</td><td class="num">32</td>
+        <td class="num">38</td><td class="num">35</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">FF</td>
+        <td class="num">0.09276</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">47</td><td class="num">16</td>
+        <td class="num">72</td><td class="num">22</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">QQQB</td>
+        <td class="num">713.76</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">28</td><td class="num">9</td>
+        <td class="num">30</td><td class="num">38</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">MORPHO</td>
+        <td class="num">2.458</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">48</td><td class="num">38</td>
+        <td class="num">45</td><td class="num">26</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">CAKE</td>
+        <td class="num">1.822</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">56</td><td class="num">46</td>
+        <td class="num">74</td><td class="num">43</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">PENDLE</td>
+        <td class="num">1.748</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">50</td><td class="num">36</td>
+        <td class="num">70</td><td class="num">30</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">EIGEN</td>
+        <td class="num">0.1882</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">12</td>
+        <td class="num">77</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ATOM</td>
+        <td class="num">1.462</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">35</td><td class="num">38</td>
+        <td class="num">31</td><td class="num">18</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">PROM</td>
+        <td class="num">6.196</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">37</td><td class="num">14</td>
+        <td class="num">45</td><td class="num">25</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">JST</td>
+        <td class="num">0.09411</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">28</td><td class="num">20</td>
+        <td class="num">34</td><td class="num">50</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">JTO</td>
+        <td class="num">0.4609</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">30</td><td class="num">17</td>
+        <td class="num">43</td><td class="num">20</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">CHIP</td>
+        <td class="num">0.03877</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">41</td><td class="num">18</td>
+        <td class="num">61</td><td class="num">12</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag chop">chop</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">CFG</td>
+        <td class="num">0.1156</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">29</td><td class="num">27</td>
+        <td class="num">21</td><td class="num">32</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ALLO</td>
+        <td class="num">0.2449</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">40</td><td class="num">23</td>
+        <td class="num">28</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag short">short</span></td></tr>
+        <tr><td class="num">LUNC</td>
+        <td class="num">5.12e-05</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">28</td>
+        <td class="num">31</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BROCCOLI714</td>
+        <td class="num">0.01677</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">28</td><td class="num">22</td>
+        <td class="num">23</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SAND</td>
+        <td class="num">0.03773</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">23</td>
+        <td class="num">39</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">AXS</td>
+        <td class="num">0.886</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">27</td>
+        <td class="num">41</td><td class="num">27</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ALGO</td>
+        <td class="num">0.0853</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">26</td>
+        <td class="num">35</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">EUL</td>
+        <td class="num">1.284</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">22</td><td class="num">16</td>
+        <td class="num">20</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">HMSTR</td>
+        <td class="num">0.0001719</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">23</td>
+        <td class="num">31</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">HEI</td>
+        <td class="num">0.1376</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">38</td><td class="num">32</td>
+        <td class="num">36</td><td class="num">16</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">STRK</td>
+        <td class="num">0.02511</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">41</td><td class="num">22</td>
+        <td class="num">64</td><td class="num">37</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SPYB</td>
+        <td class="num">767.14</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">28</td><td class="num">8</td>
+        <td class="num">24</td><td class="num">29</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BICO</td>
+        <td class="num">0.02132</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">21</td>
+        <td class="num">18</td><td class="num">21</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">MMT</td>
+        <td class="num">0.1568</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">28</td><td class="num">45</td>
+        <td class="num">18</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ONT</td>
+        <td class="num">0.05591</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">52</td><td class="num">35</td>
+        <td class="num">50</td><td class="num">27</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SPK</td>
+        <td class="num">0.0189</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">45</td><td class="num">28</td>
+        <td class="num">59</td><td class="num">27</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ROBO</td>
+        <td class="num">0.01257</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">18</td>
+        <td class="num">45</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">MSTRB</td>
+        <td class="num">127.82</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">29</td>
+        <td class="num">57</td><td class="num">30</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag long">long</span></td></tr>
+        <tr><td class="num">USUAL</td>
+        <td class="num">0.01115</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">38</td><td class="num">26</td>
+        <td class="num">38</td><td class="num">31</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">GENIUS</td>
+        <td class="num">0.2817</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">40</td><td class="num">37</td>
+        <td class="num">24</td><td class="num">20</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">MEGA</td>
+        <td class="num">0.037</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">16</td>
+        <td class="num">39</td><td class="num">22</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">EPIC</td>
+        <td class="num">0.3358</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">31</td>
+        <td class="num">25</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">AERO</td>
+        <td class="num">0.4826</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">40</td><td class="num">34</td>
+        <td class="num">40</td><td class="num">23</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag long">long</span></td></tr>
+        <tr><td class="num">CHZ</td>
+        <td class="num">0.01341</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">27</td>
+        <td class="num">22</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">SYN</td>
+        <td class="num">0.09857</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">45</td><td class="num">45</td>
+        <td class="num">43</td><td class="num">30</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">MET</td>
+        <td class="num">0.1883</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">30</td><td class="num">19</td>
+        <td class="num">28</td><td class="num">32</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">APE</td>
+        <td class="num">0.1344</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">27</td>
+        <td class="num">43</td><td class="num">21</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BNSOL</td>
+        <td class="num">115.3</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">31</td><td class="num">17</td>
+        <td class="num">41</td><td class="num">24</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SNDKB</td>
+        <td class="num">1,460.78</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">27</td><td class="num">16</td>
+        <td class="num">5</td><td class="num">27</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">NIL</td>
+        <td class="num">0.05163</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">42</td><td class="num">15</td>
+        <td class="num">51</td><td class="num">21</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BERA</td>
+        <td class="num">0.1668</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">39</td><td class="num">27</td>
+        <td class="num">40</td><td class="num">20</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">AR</td>
+        <td class="num">2.067</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">41</td><td class="num">26</td>
+        <td class="num">44</td><td class="num">22</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag short">short</span></td></tr>
+        <tr><td class="num">SKHYB</td>
+        <td class="num">157.21</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">19</td><td class="num">14</td>
+        <td class="num">2</td><td class="num">37</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ESP</td>
+        <td class="num">0.0801</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">49</td><td class="num">61</td>
+        <td class="num">62</td><td class="num">23</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag long">long</span></td></tr>
+        <tr><td class="num">CVX</td>
+        <td class="num">2.213</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">42</td><td class="num">24</td>
+        <td class="num">55</td><td class="num">29</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">FORM</td>
+        <td class="num">0.2557</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">50</td><td class="num">35</td>
+        <td class="num">73</td><td class="num">35</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">KITE</td>
+        <td class="num">0.1196</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">27</td><td class="num">13</td>
+        <td class="num">14</td><td class="num">26</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">WBTC</td>
+        <td class="num">77,923.3</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">42</td><td class="num">34</td>
+        <td class="num">58</td><td class="num">27</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SKY</td>
+        <td class="num">0.0691</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">43</td><td class="num">37</td>
+        <td class="num">45</td><td class="num">33</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">S</td>
+        <td class="num">0.028</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">31</td><td class="num">22</td>
+        <td class="num">28</td><td class="num">25</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SUN</td>
+        <td class="num">0.0166</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">23</td><td class="num">9</td>
+        <td class="num">7</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">NIGHT</td>
+        <td class="num">0.0185</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">20</td>
+        <td class="num">34</td><td class="num">21</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BMT</td>
+        <td class="num">0.02102</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">33</td><td class="num">21</td>
+        <td class="num">47</td><td class="num">19</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">EDEN</td>
+        <td class="num">0.06195</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">46</td><td class="num">35</td>
+        <td class="num">20</td><td class="num">16</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag short">short</span></td><td><span class="tag chop">chop</span></td></tr>
+        <tr><td class="num">WBETH</td>
+        <td class="num">2,686.01</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">38</td><td class="num">23</td>
+        <td class="num">28</td><td class="num">40</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">BABY</td>
+        <td class="num">0.0125</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">51</td><td class="num">33</td>
+        <td class="num">35</td><td class="num">22</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ZK</td>
+        <td class="num">0.0093</td>
+        <td class="mut">above EMA100</td>
+        <td class="num">56</td><td class="num">38</td>
+        <td class="num">45</td><td class="num">49</td>
+        <td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SAGA</td>
+        <td class="num">0.01486</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">36</td><td class="num">16</td>
+        <td class="num">32</td><td class="num">29</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">RIF</td>
+        <td class="num">0.0688</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">38</td><td class="num">30</td>
+        <td class="num">42</td><td class="num">34</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SAHARA</td>
+        <td class="num">0.00819</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">23</td>
+        <td class="num">15</td><td class="num">21</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">RAY</td>
+        <td class="num">0.7737</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">37</td><td class="num">27</td>
+        <td class="num">54</td><td class="num">25</td>
+        <td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">CFX</td>
+        <td class="num">0.04442</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">23</td>
+        <td class="num">37</td><td class="num">30</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">SOXLB</td>
+        <td class="num">109.38</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">26</td><td class="num">19</td>
+        <td class="num">8</td><td class="num">21</td>
+        <td><span class="tag short">short</span></td><td><span class="tag short">short</span></td><td><span class="tag wait">wait</span></td></tr>
+        <tr><td class="num">ARKM</td>
+        <td class="num">0.1073</td>
+        <td class="mut">below EMA100</td>
+        <td class="num">34</td><td class="num">20</td>
+        <td class="num">47</td><td class="num">18</td>
+        <td><span class="tag chop">chop</span></td><td><span class="tag wait">wait</span></td><td><span class="tag chop">chop</span></td></tr></tbody></table></div>
+  </section>
+  <footer>Simulated trading only &mdash; no orders are placed and no real money is
+    at risk. Each strategy runs one $10,000.00 account across
+    142 markets on 1h candles, risking 0.125% of
+    equity per position (capped at 1/40 notional, max
+    20 per side) behind a 2.5&times; ATR stop with a
+    2.5R target. The book halts for 24h after
+    6 consecutive losses or a 15% drawdown.</footer>
+</div>
+  <script>
+  const HIST = {"ADAUSDT": [0.2109, 0.2091, 0.2092, 0.209, 0.2096, 0.2107, 0.2112, 0.2147, 0.2148, 0.213, 0.2116, 0.2116, 0.2133, 0.2149, 0.2146, 0.2157, 0.2157, 0.2142, 0.2137, 0.214, 0.2141, 0.2144, 0.2138, 0.2144, 0.2145, 0.21, 0.2102, 0.2102, 0.2097, 0.2111, 0.2094, 0.209, 0.2079, 0.2092, 0.2093, 0.2083, 0.2077, 0.2108, 0.2045, 0.2032, 0.203, 0.2012, 0.2019, 0.2017, 0.2003, 0.2024, 0.2031, 0.2027, 0.2025, 0.2018, 0.2008, 0.2012, 0.2014, 0.2004, 0.2004, 0.1994, 0.2, 0.2002, 0.1998, 0.2001, 0.2004, 0.2026, 0.2007, 0.2006, 0.2007, 0.2011, 0.2017, 0.2014, 0.2013, 0.2012, 0.2018, 0.2011, 0.2005, 0.2009, 0.2009, 0.2004, 0.201, 0.2025, 0.2007, 0.2006, 0.2009, 0.2016, 0.2011, 0.2032, 0.2047, 0.2047, 0.2033, 0.206, 0.2049, 0.2052, 0.2033, 0.2013, 0.2002, 0.1984, 0.1927, 0.1941], "AVAXUSDT": [7.385, 7.349, 7.348, 7.339, 7.351, 7.37, 7.377, 7.472, 7.452, 7.419, 7.394, 7.399, 7.472, 7.509, 7.52, 7.528, 7.528, 7.515, 7.482, 7.525, 7.517, 7.52, 7.527, 7.52, 7.521, 7.44, 7.442, 7.436, 7.464, 7.486, 7.4, 7.397, 7.367, 7.42, 7.428, 7.404, 7.392, 7.437, 7.331, 7.299, 7.289, 7.249, 7.27, 7.275, 7.258, 7.306, 7.308, 7.299, 7.3, 7.282, 7.261, 7.299, 7.313, 7.28, 7.272, 7.243, 7.256, 7.262, 7.261, 7.283, 7.3, 7.358, 7.331, 7.32, 7.291, 7.318, 7.32, 7.325, 7.308, 7.325, 7.331, 7.316, 7.279, 7.286, 7.294, 7.288, 7.306, 7.347, 7.326, 7.325, 7.34, 7.38, 7.384, 7.398, 7.425, 7.422, 7.411, 7.447, 7.423, 7.445, 7.411, 7.366, 7.336, 7.315, 7.113, 7.152], "DASHUSDT": [38.86, 38.56, 38.72, 38.5, 38.57, 38.79, 38.97, 39.51, 39.21, 38.8, 38.84, 38.81, 39.32, 39.64, 39.67, 39.94, 40.43, 39.68, 39.68, 39.7, 39.55, 39.71, 39.58, 39.6, 39.18, 38.54, 38.51, 38.48, 38.52, 38.7, 38.53, 38.47, 38.45, 38.59, 38.81, 38.73, 38.75, 38.97, 38.06, 37.93, 37.79, 37.58, 37.73, 37.85, 37.72, 37.98, 38.48, 38.82, 38.71, 38.87, 38.72, 39.02, 38.86, 38.42, 38.52, 38.37, 38.57, 38.93, 39.12, 39.72, 40.61, 42.18, 41.82, 42.19, 42.0, 42.0, 41.31, 41.45, 40.94, 41.3, 41.27, 41.16, 41.44, 41.35, 41.34, 40.63, 41.03, 41.08, 40.92, 40.78, 40.66, 41.37, 41.46, 41.25, 41.31, 41.28, 41.5, 42.78, 42.33, 44.19, 43.64, 42.72, 43.63, 43.76, 41.71, 41.88], "LTCUSDT": [49.97, 49.91, 49.96, 49.72, 49.76, 49.75, 49.79, 50.21, 50.26, 49.93, 49.86, 49.67, 50.08, 50.25, 50.19, 50.25, 50.17, 49.97, 49.99, 49.99, 50.0, 49.99, 49.92, 50.07, 49.98, 49.35, 49.36, 49.25, 49.19, 49.39, 49.2, 48.99, 48.94, 49.08, 49.11, 49.05, 49.05, 49.36, 48.58, 48.87, 49.06, 48.89, 49.2, 49.56, 49.24, 49.32, 49.33, 49.19, 49.19, 48.99, 48.91, 49.1, 49.19, 49.31, 49.25, 49.06, 48.87, 48.81, 48.73, 48.8, 48.94, 49.17, 49.09, 48.89, 48.78, 48.78, 48.9, 48.93, 48.92, 48.96, 49.02, 48.79, 48.82, 48.92, 48.9, 48.83, 48.97, 49.06, 48.91, 49.03, 49.11, 49.26, 49.37, 49.69, 49.67, 49.89, 50.02, 50.07, 49.92, 49.94, 49.71, 49.29, 49.14, 48.8, 47.94, 48.33], "POLUSDT": [0.10558, 0.10632, 0.10481, 0.10567, 0.10575, 0.10671, 0.10714, 0.10894, 0.10849, 0.1074, 0.10631, 0.1063, 0.10833, 0.10756, 0.10741, 0.10718, 0.1081, 0.10745, 0.10805, 0.10857, 0.10745, 0.10752, 0.10789, 0.10919, 0.10977, 0.10794, 0.10722, 0.10633, 0.10594, 0.10718, 0.10677, 0.10745, 0.10714, 0.10768, 0.10758, 0.10842, 0.10824, 0.10767, 0.10688, 0.10703, 0.10833, 0.10692, 0.10715, 0.10762, 0.10693, 0.10764, 0.10817, 0.10695, 0.10635, 0.10654, 0.10616, 0.10616, 0.10652, 0.10549, 0.10541, 0.10544, 0.1053, 0.10524, 0.10501, 0.10478, 0.105, 0.10519, 0.10487, 0.10424, 0.10382, 0.10272, 0.10248, 0.10155, 0.10134, 0.10182, 0.1071, 0.1058, 0.10429, 0.10432, 0.1041, 0.10346, 0.10362, 0.10373, 0.10301, 0.10418, 0.10334, 0.10406, 0.10484, 0.10543, 0.10303, 0.1028, 0.10203, 0.10167, 0.09873, 0.10028, 0.09961, 0.09952, 0.09926, 0.09888, 0.09711, 0.0966], "UNIUSDT": [4.385, 4.405, 4.39, 4.373, 4.381, 4.389, 4.38, 4.454, 4.466, 4.447, 4.458, 4.471, 4.526, 4.508, 4.52, 4.56, 4.614, 4.62, 4.593, 4.623, 4.627, 4.683, 4.684, 4.724, 4.719, 4.632, 4.682, 4.674, 4.633, 4.659, 4.601, 4.607, 4.577, 4.593, 4.64, 4.582, 4.579, 4.61, 4.484, 4.447, 4.424, 4.379, 4.397, 4.397, 4.366, 4.428, 4.437, 4.423, 4.437, 4.402, 4.379, 4.401, 4.434, 4.411, 4.396, 4.359, 4.362, 4.381, 4.388, 4.401, 4.408, 4.505, 4.488, 4.64, 4.621, 4.664, 4.647, 4.663, 4.652, 4.686, 4.682, 4.652, 4.711, 4.872, 4.909, 4.865, 4.892, 4.947, 4.89, 4.836, 4.815, 4.957, 5.108, 5.239, 5.231, 5.191, 5.165, 5.381, 5.438, 5.444, 5.337, 5.284, 5.275, 5.255, 5.131, 5.151], "UUSDT": [0.9995, 0.9995, 0.9995, 0.9996, 0.9996, 0.9995, 0.9995, 0.9996, 0.9995, 0.9995, 0.9996, 0.9996, 0.9996, 0.9995, 0.9995, 0.9994, 0.9994, 0.9994, 0.9994, 0.9994, 0.9995, 0.9995, 0.9995, 0.9996, 0.9995, 0.9996, 0.9995, 0.9995, 0.9995, 0.9995, 0.9995, 0.9995, 0.9995, 0.9995, 0.9994, 0.9994, 0.9994, 0.9994, 0.9995, 0.9994, 0.9994, 0.9994, 0.9995, 0.9994, 0.9994, 0.9995, 0.9995, 0.9994, 0.9995, 0.9995, 0.9994, 0.9995, 0.9996, 0.9995, 0.9996, 0.9996, 0.9995, 0.9995, 0.9996, 0.9995, 0.9996, 0.9996, 0.9996, 0.9995, 0.9995, 0.9996, 0.9996, 0.9995, 0.9995, 0.9996, 0.9997, 0.9996, 0.9996, 0.9995, 0.9996, 0.9996, 0.9995, 0.9995, 0.9996, 0.9996, 0.9996, 0.9996, 0.9995, 0.9996, 0.9997, 0.9997, 0.9996, 0.9998, 0.9997, 0.9996, 0.9996, 0.9996, 0.9996, 0.9997, 0.9996, 0.9996], "ZECUSDT": [796.0, 781.88, 780.59, 778.01, 782.75, 786.62, 785.96, 793.17, 794.61, 780.79, 783.76, 780.58, 793.18, 795.25, 803.72, 812.11, 823.04, 816.07, 816.0, 817.08, 809.29, 813.08, 810.0, 810.29, 802.62, 785.95, 788.65, 786.55, 788.59, 793.61, 789.9, 786.47, 789.87, 797.37, 799.89, 797.26, 795.95, 811.45, 806.42, 798.48, 793.12, 789.91, 797.03, 796.77, 794.38, 801.63, 800.45, 799.35, 804.78, 807.9, 798.72, 800.63, 800.53, 794.25, 792.96, 793.01, 797.76, 804.76, 804.85, 806.66, 810.62, 839.93, 834.82, 835.12, 836.58, 834.24, 833.39, 838.09, 838.11, 840.19, 841.6, 836.81, 831.9, 831.5, 831.29, 830.45, 831.88, 837.79, 835.85, 836.07, 835.45, 841.13, 840.52, 848.77, 850.82, 850.17, 866.66, 887.52, 873.62, 869.73, 864.73, 853.49, 873.66, 861.88, 835.29, 835.13]};
+  const sel = document.getElementById('symsel');
+  const svg = document.getElementById('bigchart');
+
+  function draw(sym) {
+    const pts = HIST[sym] || [];
+    svg.innerHTML = '';
+    if (pts.length < 3) return;
+    const W = 900, H = 320, pad = 14;
+    const lo = Math.min(...pts), hi = Math.max(...pts), span = (hi - lo) || 1;
+    const x = i => pad + (W - 2 * pad) * (i / (pts.length - 1));
+    const y = v => pad + (H - 2 * pad) * (1 - (v - lo) / span);
+    const line = pts.map((v, i) => x(i).toFixed(0) + ',' + y(v).toFixed(1)).join(' ');
+    const up = pts[pts.length - 1] >= pts[0];
+    const col = up ? 'var(--pos)' : 'var(--neg)';
+    const ns = 'http://www.w3.org/2000/svg';
+    const poly = document.createElementNS(ns, 'polygon');
+    poly.setAttribute('points', pad + ',' + (H - pad) + ' ' + line + ' ' + (W - pad) + ',' + (H - pad));
+    poly.setAttribute('fill', col); poly.setAttribute('fill-opacity', '0.10');
+    svg.appendChild(poly);
+    const pl = document.createElementNS(ns, 'polyline');
+    pl.setAttribute('points', line); pl.setAttribute('fill', 'none');
+    pl.setAttribute('stroke', col); pl.setAttribute('stroke-width', '2');
+    pl.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(pl);
+  }
+
+  // Try the real widget. If the host blocks external scripts (every artifact
+  // page does) the error handler fires and the native chart simply stays.
+  let tvReady = false;
+  function mountTV(sym) {
+    if (!tvReady) return;
+    document.getElementById('tv').innerHTML = '';
+    try {
+      new TradingView.widget({
+        container_id: 'tv', symbol: 'BINANCE:' + sym, interval: '60',
+        autosize: false, width: '100%', height: 380, theme:
+          (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+        style: '1', locale: 'en', hide_side_toolbar: true, allow_symbol_change: false,
+      });
+      document.getElementById('fallback').style.display = 'none';
+    } catch (e) { tvReady = false; }
+  }
+
+  const tag = document.createElement('script');
+  tag.src = 'https://s3.tradingview.com/tv.js';
+  tag.onload = () => { tvReady = true; mountTV(sel.value); };
+  tag.onerror = () => {
+    document.getElementById('cnote').textContent =
+      'TradingView is blocked on this host, so the chart is drawn here from the '
+      + 'same Binance hourly candles the books trade on.';
+  };
+  document.head.appendChild(tag);
+
+  sel.addEventListener('change', () => { draw(sel.value); mountTV(sel.value); });
+  draw(sel.value);
+  </script>
+
+  <script>
+  (function () {
+    const CASH = 19963.9845;
+    const cards = [...document.querySelectorAll('.holding[data-sym]')];
+    // Ask for the held symbols only. The unfiltered endpoint returns ~3,700
+    // symbols and 150KB; every five seconds that is 100MB an hour down someone's
+    // phone to read a dozen prices.
+    const syms = [...new Set(cards.map(c => c.dataset.sym))];
+    const URL_ = 'https://data-api.binance.vision/api/v3/ticker/price?symbols='
+      + encodeURIComponent(JSON.stringify(syms));
+    const nw = document.querySelector('.js-networth');
+    const un = document.querySelector('.js-unreal');
+    const money = n => (n < 0 ? '-' : '') + '$' +
+      Math.abs(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const signed = n => (n >= 0 ? '+' : '') +
+      n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const klass = (el, n) => {
+      el.classList.remove('pos', 'neg');
+      el.classList.add(n >= 0 ? 'pos' : 'neg');
+    };
+
+    async function tick() {
+      let map;
+      try {
+        const r = await fetch(URL_);
+        if (!r.ok) throw new Error(r.status);
+        map = new Map((await r.json()).map(x => [x.symbol, parseFloat(x.price)]));
+      } catch (e) { return false; }
+
+      let unreal = 0;
+      for (const c of cards) {
+        const px = map.get(c.dataset.sym);
+        if (!px) continue;
+        const entry = parseFloat(c.dataset.entry), qty = parseFloat(c.dataset.qty);
+        const d = c.dataset.side === 'long' ? px - entry : entry - px;
+        const pnl = d * qty;
+        unreal += pnl;
+        const el = c.querySelector('.js-pnl');
+        if (el) {
+          el.firstChild.nodeValue = signed(pnl) + ' ';
+          const pct = el.querySelector('span');
+          if (pct) pct.textContent = signed(d / entry * 100) + '%';
+          klass(el, pnl);
+        }
+        const now = c.querySelector('.js-now');
+        if (now) now.textContent = 'Now ' + px.toLocaleString('en-US',
+          {minimumFractionDigits: 4, maximumFractionDigits: 4});
+      }
+      if (un) { un.textContent = money(unreal); klass(un, unreal); }
+      if (nw) nw.textContent = money(CASH + unreal);
+      const stamp = document.getElementById('pricedat');
+      if (stamp) stamp.textContent = 'Prices ' +
+        new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit',
+                                           second: '2-digit'});
+      return true;
+    }
+
+    // GitHub Pages serves cache-control: max-age=600, so a browser will happily
+    // show a ten-minute-old page and never ask for a newer one -- stacked on
+    // Bob's ten-minute render that is up to twenty minutes stale. Poll the page
+    // itself past the cache and reload only when the build stamp has actually
+    // moved, so nothing flickers when there is nothing new.
+    const BUILT = (document.getElementById('built') || {}).textContent || '';
+    async function checkBuild() {
+      try {
+        const r = await fetch(location.pathname + '?_=' + Date.now(),
+                              {cache: 'no-store'});
+        if (!r.ok) return;
+        const t = (await r.text()).match(/id="built"[^>]*>([^<]*)</);
+        if (t && t[1] && t[1] !== BUILT) location.reload();
+      } catch (e) { /* offline or blocked: keep showing what we have */ }
+    }
+
+    // Always on: it is the only thing that gets a new build past the cache,
+    // and it must survive a blocked price feed and an empty book alike.
+    setInterval(checkBuild, 60000);
+
+    if (cards.length) {
+      tick().then(ok => {
+        if (!ok) return;          // host blocks the fetch: keep what was rendered
+        const pill = document.querySelector('.pill');
+        if (pill) pill.lastChild.nodeValue = 'Live prices';
+        setInterval(tick, 5000);
+      });
+    }
+  })();
+  </script>
+

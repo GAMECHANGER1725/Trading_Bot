@@ -1,0 +1,331 @@
+<title>Bob · Glossary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#EDF0F2; --surface:#FFFFFF; --surface-2:#F6F8F9;
+  --ink:#10161C; --muted:#5C6B78; --line:#D4DBE0;
+  --accent:#2E5EAA; --s0:#8A8F98; --s1:#B4531F; --s2:#0F7A6C;
+  --pos:#1B7A3E; --neg:#B3261E; --warn:#8A6410;
+  --pos-bg:#E6F2EA; --neg-bg:#FBE9E7; --warn-bg:#FBF2DF;
+  --shadow:0 1px 2px rgba(16,22,28,.06),0 8px 24px rgba(16,22,28,.05);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1418; --surface:#131C22; --surface-2:#18242B;
+    --ink:#E4EBEF; --muted:#8798A5; --line:#233039;
+    --accent:#6E9BE8; --s0:#7E838C; --s1:#E08040; --s2:#35B8A5;
+    --pos:#3DBE6E; --neg:#E4574C; --warn:#D6A93C;
+    --pos-bg:#12271B; --neg-bg:#2A1614; --warn-bg:#251E0E;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1418; --surface:#131C22; --surface-2:#18242B;
+  --ink:#E4EBEF; --muted:#8798A5; --line:#233039;
+  --accent:#6E9BE8; --s0:#7E838C; --s1:#E08040; --s2:#35B8A5;
+  --pos:#3DBE6E; --neg:#E4574C; --warn:#D6A93C;
+  --pos-bg:#12271B; --neg-bg:#2A1614; --warn-bg:#251E0E;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  padding:32px 20px 64px;
+}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.num{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums}
+.lbl{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted)}
+
+/* header */
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
+  flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--line)}
+h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:30px;font-weight:600;
+  letter-spacing:-.015em;text-wrap:balance}
+.tagline{color:var(--muted);font-size:13.5px;margin-top:3px;max-width:62ch}
+.stamp{text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+  padding:4px 10px;border-radius:100px;border:1px solid transparent}
+.pill.live{background:var(--pos-bg);color:var(--pos);border-color:currentColor}
+.pill.stale{background:var(--warn-bg);color:var(--warn);border-color:currentColor}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+/* verdict */
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:20px 22px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+.verdict-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.verdict-head h2{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.verdict p{color:var(--muted);font-size:13.5px;max-width:78ch}
+.meter{display:flex;flex-direction:column;gap:7px}
+.meter-track{height:7px;border-radius:100px;background:var(--surface-2);
+  border:1px solid var(--line);overflow:hidden;display:flex}
+.meter-fill{background:var(--accent);height:100%}
+.meter-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+
+/* glossary */
+.glossary{display:flex;flex-direction:column}
+.gl{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:20px;
+  padding:13px 0;border-top:1px solid var(--line)}
+.gl:first-child{border-top:0;padding-top:0}
+.gl dt{font-weight:600;font-size:13.5px}
+.gl dd{color:var(--muted);font-size:13.5px;max-width:76ch}
+.gl dd em{font-style:normal;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:12.5px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+@media (max-width:640px){.gl{grid-template-columns:1fr;gap:4px}}
+
+/* nav */
+.nav{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;padding:4px;box-shadow:var(--shadow);overflow-x:auto}
+.nav a{flex:1 1 auto;text-align:center;white-space:nowrap;padding:8px 16px;
+  border-radius:7px;font-size:13.5px;font-weight:500;text-decoration:none;
+  color:var(--muted);transition:background .12s,color .12s}
+.nav a:hover{background:var(--surface-2);color:var(--ink)}
+.nav a.on{background:var(--accent);color:#fff}
+.nav a.on:hover{background:var(--accent);color:#fff}
+
+/* portfolio summary */
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);padding:22px 24px;display:flex;gap:28px;
+  align-items:flex-start;flex-wrap:wrap}
+.summary .big{display:flex;flex-direction:column;gap:3px;min-width:240px;flex:1 1 240px}
+.summary .big .v{font-size:38px;font-weight:600;letter-spacing:-.03em;line-height:1.1}
+.summary .sub{font-size:12.5px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+  gap:18px;flex:2 1 420px}
+.tile{display:flex;flex-direction:column;gap:2px}
+.tile .v{font-size:20px;font-weight:600;letter-spacing:-.02em}
+
+/* open position cards */
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
+.holding{border:1px solid var(--line);border-radius:10px;padding:13px 14px;
+  background:var(--surface-2);display:flex;flex-direction:column;gap:9px}
+.pos-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pos-top .sym{font-weight:600;font-size:15px;margin-right:7px}
+.pos-pnl{font-size:14px;font-weight:600;text-align:right}
+.pos-book{font-size:11px;color:var(--muted);margin-top:-6px}
+.spark{width:100%;height:76px;display:block}
+.spark-empty{height:76px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:6px}
+.rule{stroke-width:1;stroke-dasharray:3 3}
+.rule.sl{stroke:var(--neg)} .rule.tp{stroke:var(--pos)} .rule.en{stroke:var(--muted)}
+.pos-bar{height:4px;border-radius:100px;background:var(--neg);opacity:.25;overflow:hidden}
+.pos-bar-fill{height:100%;background:var(--pos);opacity:1}
+.pos-legs{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;
+  color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace}
+.pos-legs i.k{display:inline-block;width:7px;height:2px;margin-right:4px;
+  vertical-align:middle;border-radius:2px}
+.pos-legs i.sl{background:var(--neg)} .pos-legs i.tp{background:var(--pos)}
+.pos-legs i.en{background:var(--muted)}
+.pos-foot{display:flex;justify-content:space-between;align-items:center;
+  font-size:11.5px;padding-top:2px;border-top:1px solid var(--line)}
+.pos-foot a{color:var(--accent);text-decoration:none;font-weight:500}
+.pos-foot a:hover{text-decoration:underline}
+.ev{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;letter-spacing:.04em}
+.ev.entry{background:var(--surface-2);color:var(--accent);border:1px solid var(--line)}
+.ev.exit{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+
+#tv:empty{display:none}
+#bigchart{width:100%;height:320px;display:block}
+.chart-note{font-size:12px;color:var(--muted);margin-top:8px}
+#symsel{font:inherit;font-size:13px;padding:5px 9px;border-radius:7px;
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink)}
+
+/* cards */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+.card.s0{border-top:3px solid var(--s0)}
+.card.bench{border-top:3px solid var(--muted);border-style:dashed solid solid solid}
+.card-note{margin-top:10px;font-size:12px;line-height:1.5;color:var(--muted)}
+.card.s1{border-top:3px solid var(--s1)}
+.card.s2{border-top:3px solid var(--s2)}
+.card h3{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.swatch{width:9px;height:9px;border-radius:2px}
+.figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:14px}
+.fig{display:flex;flex-direction:column;gap:2px}
+.fig .v{font-size:21px;font-weight:600;letter-spacing:-.02em}
+.fig .v.sm{font-size:17px}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .mut{color:var(--muted)}
+
+/* sections */
+section{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);overflow:hidden}
+.sec-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;
+  justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.sec-head h2{font-size:15px;font-weight:600}
+.sec-body{padding:18px 20px}
+.legend{display:flex;gap:16px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.chart{width:100%;height:260px}
+.chart svg{width:100%;height:100%;display:block}
+.grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 5;opacity:.7}
+.baseline{stroke:var(--muted);stroke-width:1;stroke-dasharray:5 4;opacity:.55}
+.empty-chart{height:260px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;color:var(--muted);background:var(--surface-2);
+  border-radius:8px;border:1px dashed var(--line)}
+.empty-chart span{font-size:14px;font-weight:600}
+.empty-chart small{font-size:12.5px}
+
+/* tables */
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);padding:0 14px 9px;white-space:nowrap}
+td{padding:9px 14px;border-top:1px solid var(--line);white-space:nowrap}
+tbody tr:hover{background:var(--surface-2)}
+.tag{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;
+  border-radius:4px;letter-spacing:.03em}
+.tag.long{background:var(--pos-bg);color:var(--pos)}
+.tag.short{background:var(--neg-bg);color:var(--neg)}
+.tag.chop{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.tag.wait{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.empty-row{padding:26px 20px;text-align:center;color:var(--muted);font-size:13.5px}
+
+footer{color:var(--muted);font-size:12.5px;text-align:center;padding-top:6px;
+  max-width:70ch;margin:0 auto;line-height:1.6}
+@media (max-width:600px){
+  body{padding:20px 14px 48px} h1{font-size:24px}
+  .stamp{text-align:left;align-items:flex-start}
+}
+</style>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Bob</h1>
+      <p class="tagline">What every number and label on this site actually means.</p>
+    </div>
+    <div class="stamp">
+      <span class="pill live"><span class="dot"></span>Running</span>
+      <span class="lbl" id="built">Page built 31 Aug 2026 · 01:55 UTC</span>
+      <span class="lbl" id="pricedat"></span>
+    </div>
+  </header>
+  <nav class="nav"><a href="index.html">Portfolio</a><a href="orders.html">Orders</a><a href="markets.html">Markets</a><a href="research.html">Research</a><a href="glossary.html" class='on'>Glossary</a></nav>
+
+  <section>
+    <div class="sec-head"><h2>Your money</h2></div>
+    <div class="sec-body"><dl class="glossary"><div class="gl"><dt>Portfolio net worth</dt><dd>Everything the two strategies are worth right now: cash plus what the open positions would fetch if they closed at the current price. This is the number that answers 'how am I doing'. It starts at $20,000 — $10,000 for each strategy.</dd></div><div class="gl"><dt>Cash</dt><dd>Money not currently in a trade. It only changes when a position closes. Opening a trade moves value from cash into the position, it does not spend it.</dd></div><div class="gl"><dt>In open trades / Unrealised</dt><dd>Profit or loss on positions still open. Real in the sense that it is what you would get if everything closed now; not real in the sense that it can vanish before that happens. Nothing is booked until a position closes.</dd></div><div class="gl"><dt>Realised P&amp;L</dt><dd>Profit or loss from trades that have actually closed. The part that cannot be taken back.</dd></div><div class="gl"><dt>Round trip</dt><dd>One complete trade: an entry and its matching exit. Two orders, one round trip. The statistics count round trips, not orders.</dd></div></dl></div>
+  </section>
+  <section>
+    <div class="sec-head"><h2>Positions and trades</h2></div>
+    <div class="sec-body"><dl class="glossary"><div class="gl"><dt>Long</dt><dd>A bet the price goes up. Buy at $100, sell at $110, you made $10.</dd></div><div class="gl"><dt>Short</dt><dd>A bet the price goes down. You sell first at $100 and buy back at $90, keeping the $10. Bob trades both, because crypto falls as often as it rises.</dd></div><div class="gl"><dt>Entry</dt><dd>The price a position was opened at.</dd></div><div class="gl"><dt>Stop / stop-loss</dt><dd>A price that closes the trade at a loss to stop it getting worse. Bob puts it 2.5 ATR from entry, so a jumpy coin gets a wider stop than a calm one: same risk, different distance.</dd></div><div class="gl"><dt>Target / take-profit</dt><dd>A price that closes the trade at a profit. Bob sets it 2.5 times as far away as the stop, which is what '2.5R' means.</dd></div><div class="gl"><dt>Open position</dt><dd>A trade that has been entered and not yet exited.</dd></div><div class="gl"><dt>Signal-flatten</dt><dd>An exit that happens because the reason for the trade disappeared — the trend died or reversed — rather than because the stop or target was hit.</dd></div></dl></div>
+  </section>
+  <section>
+    <div class="sec-head"><h2>The order log</h2></div>
+    <div class="sec-body"><dl class="glossary"><div class="gl"><dt>ENTRY</dt><dd>An order that opened a position.</dd></div><div class="gl"><dt>EXIT</dt><dd>An order that closed one. Its P&amp;L column is what that trade made or lost.</dd></div><div class="gl"><dt>Book</dt><dd>Which of the seven accounts placed the order. Two run the real strategies; five enter at random as a comparison.</dd></div><div class="gl"><dt>Reason</dt><dd>Why a position closed: <em>take-profit</em>, <em>stop-loss</em>, or <em>signal-flatten</em>.</dd></div></dl></div>
+  </section>
+  <section>
+    <div class="sec-head"><h2>What the strategies look at</h2></div>
+    <div class="sec-body"><dl class="glossary"><div class="gl"><dt>Candle</dt><dd>One hour of price as four numbers: where it opened, the highest it went, the lowest, and where it closed. Bob only acts on candles that have finished, never a half-formed one.</dd></div><div class="gl"><dt>EMA100 baseline</dt><dd>The average price over the last 100 hours, weighted towards recent ones. Above it is an uptrend, below it a downtrend. The first thing every strategy checks.</dd></div><div class="gl"><dt>Confluence</dt><dd>Requiring several independent indicators to agree before trading. Any one indicator fires constantly and most of it is noise; demanding agreement cuts it down to something worth acting on.</dd></div><div class="gl"><dt>RSI</dt><dd>Relative Strength Index, 0–100. How one-sided recent moves have been. Above 55 counts as bullish here, below 45 bearish.</dd></div><div class="gl"><dt>MACD</dt><dd>Compares a fast and a slow average of price. Fast above slow means momentum is upward.</dd></div><div class="gl"><dt>Stochastic</dt><dd>0–100. Where the price sits inside its recent high-to-low range. Near 100 means it is closing at the top of its range.</dd></div><div class="gl"><dt>MFI</dt><dd>Money Flow Index, 0–100. Like RSI but weighted by volume, so it asks whether the money moving in matches the price moving up.</dd></div><div class="gl"><dt>ADX</dt><dd>0–100. How strongly a market is trending, in either direction. Below the threshold the market is chopping sideways and Bob refuses to trade it — chop is where trend systems bleed.</dd></div><div class="gl"><dt>ATR</dt><dd>Average True Range: how far this market typically moves in an hour. Position size and stop distance are both scaled by it.</dd></div><div class="gl"><dt>Reads: long / short / chop / wait</dt><dd>What a strategy currently sees. <em>chop</em> means the trend filter has ruled the market out; <em>wait</em> means it is trending but the indicators do not agree yet.</dd></div></dl></div>
+  </section>
+  <section>
+    <div class="sec-head"><h2>How risk is controlled</h2></div>
+    <div class="sec-body"><dl class="glossary"><div class="gl"><dt>R / 2.5R</dt><dd>R is the amount risked on a trade. A 2.5R target aims to make two and a half times what it risks — which is why Bob can win well under half his trades and still come out ahead.</dd></div><div class="gl"><dt>Risk per trade</dt><dd>0.125% of the account on any single position. Equal risk everywhere, so a volatile coin takes a smaller position than a calm one for the same money at stake.</dd></div><div class="gl"><dt>Notional</dt><dd>The full size of a position. Capped at 1/40 of the account so nothing can dominate.</dd></div><div class="gl"><dt>Max per side</dt><dd>At most 20 longs and 20 shorts at once. Crypto markets move together, so twenty longs are closer to one big bet than twenty separate ones.</dd></div><div class="gl"><dt>Drawdown</dt><dd>How far the account has fallen from its highest point. Bob halts at 15.0%.</dd></div><div class="gl"><dt>Halt</dt><dd>Trading stops for 24h after 6 losses in a row, or that drawdown. Position size also halves after 3 losses in a row, before the full halt.</dd></div><div class="gl"><dt>Commission</dt><dd>0.05% charged on every side of every trade, in and out.</dd></div><div class="gl"><dt>Slippage and spread</dt><dd>The spread is the gap between the best price a buyer offers and the best a seller asks; crossing it costs you roughly half of it. Bob charges each market its own live half-spread rather than one flat figure — that runs from almost nothing on Bitcoin to around 0.075% on the thinnest coins here. Never less than 0.005% (a momentarily zero spread is not a free fill) and never more than 0.25% (a quote that wide is a broken order book, not a tradable one). It always counts against Bob, so the numbers are not flattering themselves.</dd></div></dl></div>
+  </section>
+  <section>
+    <div class="sec-head"><h2>Judging whether it works</h2></div>
+    <div class="sec-body"><dl class="glossary"><div class="gl"><dt>Buy &amp; hold</dt><dd>What you would have if you simply bought all 142 coins in equal amounts at the start and did nothing. The honest thing to compare against: a strategy below this line lost money by being clever.</dd></div><div class="gl"><dt>Control / random entry</dt><dd>Five accounts that enter at random, with exactly the same markets, stops, targets and sizing as the real strategies. The only difference is that their entries carry no information. If the strategies cannot beat these, the indicators are doing nothing and any profit came from the risk rules instead.</dd></div><div class="gl"><dt>Why five controls</dt><dd>One random account is one roll of the dice and can look brilliant by luck. Five give a range to place the real strategies inside.</dd></div><div class="gl"><dt>Per trade</dt><dd>Average profit or loss per closed trade. The fairest way to compare accounts that trade at different rates.</dd></div><div class="gl"><dt>Win rate</dt><dd>Share of closed trades that made money. On its own it says very little: a 2.5R target behind an ATR stop wins about 28% of the time on pure chance, so 30% is not evidence of skill.</dd></div><div class="gl"><dt>t-statistic</dt><dd>How confident you can be that a result is not luck. Above 2 is the usual bar. It shows as a dash until there are at least 10 closed trades, because on two or three it produces enormous numbers that mean nothing.</dd></div><div class="gl"><dt>Evidence collected</dt><dd>Progress towards roughly 100 closed trades per strategy, about where returns start to be distinguishable from luck. Until then the standings are entertainment.</dd></div><div class="gl"><dt>Paper trading</dt><dd>Simulated money on real prices. No exchange account, no orders, nothing at risk. The prices and the costs are real; the money is not.</dd></div></dl></div>
+  </section>
+  <footer>Simulated trading only &mdash; no orders are placed and no real money is
+    at risk. Each strategy runs one $10,000.00 account across
+    142 markets on 1h candles, risking 0.125% of
+    equity per position (capped at 1/40 notional, max
+    20 per side) behind a 2.5&times; ATR stop with a
+    2.5R target. The book halts for 24h after
+    6 consecutive losses or a 15% drawdown.</footer>
+</div>
+
+  <script>
+  (function () {
+    const CASH = 19963.9845;
+    const cards = [...document.querySelectorAll('.holding[data-sym]')];
+    // Ask for the held symbols only. The unfiltered endpoint returns ~3,700
+    // symbols and 150KB; every five seconds that is 100MB an hour down someone's
+    // phone to read a dozen prices.
+    const syms = [...new Set(cards.map(c => c.dataset.sym))];
+    const URL_ = 'https://data-api.binance.vision/api/v3/ticker/price?symbols='
+      + encodeURIComponent(JSON.stringify(syms));
+    const nw = document.querySelector('.js-networth');
+    const un = document.querySelector('.js-unreal');
+    const money = n => (n < 0 ? '-' : '') + '$' +
+      Math.abs(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const signed = n => (n >= 0 ? '+' : '') +
+      n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const klass = (el, n) => {
+      el.classList.remove('pos', 'neg');
+      el.classList.add(n >= 0 ? 'pos' : 'neg');
+    };
+
+    async function tick() {
+      let map;
+      try {
+        const r = await fetch(URL_);
+        if (!r.ok) throw new Error(r.status);
+        map = new Map((await r.json()).map(x => [x.symbol, parseFloat(x.price)]));
+      } catch (e) { return false; }
+
+      let unreal = 0;
+      for (const c of cards) {
+        const px = map.get(c.dataset.sym);
+        if (!px) continue;
+        const entry = parseFloat(c.dataset.entry), qty = parseFloat(c.dataset.qty);
+        const d = c.dataset.side === 'long' ? px - entry : entry - px;
+        const pnl = d * qty;
+        unreal += pnl;
+        const el = c.querySelector('.js-pnl');
+        if (el) {
+          el.firstChild.nodeValue = signed(pnl) + ' ';
+          const pct = el.querySelector('span');
+          if (pct) pct.textContent = signed(d / entry * 100) + '%';
+          klass(el, pnl);
+        }
+        const now = c.querySelector('.js-now');
+        if (now) now.textContent = 'Now ' + px.toLocaleString('en-US',
+          {minimumFractionDigits: 4, maximumFractionDigits: 4});
+      }
+      if (un) { un.textContent = money(unreal); klass(un, unreal); }
+      if (nw) nw.textContent = money(CASH + unreal);
+      const stamp = document.getElementById('pricedat');
+      if (stamp) stamp.textContent = 'Prices ' +
+        new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit',
+                                           second: '2-digit'});
+      return true;
+    }
+
+    // GitHub Pages serves cache-control: max-age=600, so a browser will happily
+    // show a ten-minute-old page and never ask for a newer one -- stacked on
+    // Bob's ten-minute render that is up to twenty minutes stale. Poll the page
+    // itself past the cache and reload only when the build stamp has actually
+    // moved, so nothing flickers when there is nothing new.
+    const BUILT = (document.getElementById('built') || {}).textContent || '';
+    async function checkBuild() {
+      try {
+        const r = await fetch(location.pathname + '?_=' + Date.now(),
+                              {cache: 'no-store'});
+        if (!r.ok) return;
+        const t = (await r.text()).match(/id="built"[^>]*>([^<]*)</);
+        if (t && t[1] && t[1] !== BUILT) location.reload();
+      } catch (e) { /* offline or blocked: keep showing what we have */ }
+    }
+
+    // Always on: it is the only thing that gets a new build past the cache,
+    // and it must survive a blocked price feed and an empty book alike.
+    setInterval(checkBuild, 60000);
+
+    if (cards.length) {
+      tick().then(ok => {
+        if (!ok) return;          // host blocks the fetch: keep what was rendered
+        const pill = document.querySelector('.pill');
+        if (pill) pill.lastChild.nodeValue = 'Live prices';
+        setInterval(tick, 5000);
+      });
+    }
+  })();
+  </script>
+
