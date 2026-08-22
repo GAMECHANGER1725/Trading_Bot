@@ -650,7 +650,7 @@ def sync_dashboard_to_github(dashboard_path="dashboard.html"):
         # are the real site.
         src_dir = os.path.dirname(os.path.abspath(dashboard_path)) or "."
         for name in ("dashboard.html", "index.html", "orders.html",
-                     "markets.html", "research.html"):
+                     "markets.html", "research.html", "glossary.html"):
             src = os.path.join(src_dir, name)
             if os.path.exists(src):
                 shutil.copy(src, os.path.join(GITHUB_SYNC_WORKTREE, name))

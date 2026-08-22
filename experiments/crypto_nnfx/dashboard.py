@@ -366,6 +366,17 @@ h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:30px;font-weight:600;
 .meter-fill{background:var(--accent);height:100%}
 .meter-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 
+/* glossary */
+.glossary{display:flex;flex-direction:column}
+.gl{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:20px;
+  padding:13px 0;border-top:1px solid var(--line)}
+.gl:first-child{border-top:0;padding-top:0}
+.gl dt{font-weight:600;font-size:13.5px}
+.gl dd{color:var(--muted);font-size:13.5px;max-width:76ch}
+.gl dd em{font-style:normal;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:12.5px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+@media (max-width:640px){.gl{grid-template-columns:1fr;gap:4px}}
+
 /* nav */
 .nav{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);
   border-radius:10px;padding:4px;box-shadow:var(--shadow);overflow-x:auto}
@@ -559,8 +570,201 @@ CHART_JS = """  <script>
   </script>
 """
 
+
+# Every term that appears anywhere on the site, in plain language. Grouped the
+# way someone reads the pages rather than alphabetically: you meet them in this
+# order.
+GLOSSARY = [
+    ("Your money", [
+        ("Portfolio net worth",
+         "Everything the two strategies are worth right now: cash plus what the "
+         "open positions would fetch if they closed at the current price. This "
+         "is the number that answers 'how am I doing'. It starts at $20,000 — "
+         "$10,000 for each strategy."),
+        ("Cash",
+         "Money not currently in a trade. It only changes when a position "
+         "closes. Opening a trade moves value from cash into the position, it "
+         "does not spend it."),
+        ("In open trades / Unrealised",
+         "Profit or loss on positions still open. Real in the sense that it is "
+         "what you would get if everything closed now; not real in the sense "
+         "that it can vanish before that happens. Nothing is booked until a "
+         "position closes."),
+        ("Realised P&amp;L",
+         "Profit or loss from trades that have actually closed. The part that "
+         "cannot be taken back."),
+        ("Round trip",
+         "One complete trade: an entry and its matching exit. Two orders, one "
+         "round trip. The statistics count round trips, not orders."),
+    ]),
+    ("Positions and trades", [
+        ("Long",
+         "A bet the price goes up. Buy at $100, sell at $110, you made $10."),
+        ("Short",
+         "A bet the price goes down. You sell first at $100 and buy back at "
+         "$90, keeping the $10. Bob trades both, because crypto falls as often "
+         "as it rises."),
+        ("Entry", "The price a position was opened at."),
+        ("Stop / stop-loss",
+         "A price that closes the trade at a loss to stop it getting worse. Bob "
+         "puts it 2.5 ATR from entry, so a jumpy coin gets a wider stop than a "
+         "calm one: same risk, different distance."),
+        ("Target / take-profit",
+         "A price that closes the trade at a profit. Bob sets it 2.5 times as "
+         "far away as the stop, which is what '2.5R' means."),
+        ("Open position",
+         "A trade that has been entered and not yet exited."),
+        ("Signal-flatten",
+         "An exit that happens because the reason for the trade disappeared — "
+         "the trend died or reversed — rather than because the stop or target "
+         "was hit."),
+    ]),
+    ("The order log", [
+        ("ENTRY", "An order that opened a position."),
+        ("EXIT",
+         "An order that closed one. Its P&amp;L column is what that trade made "
+         "or lost."),
+        ("Book",
+         "Which of the seven accounts placed the order. Two run the real "
+         "strategies; five enter at random as a comparison."),
+        ("Reason",
+         "Why a position closed: <em>take-profit</em>, <em>stop-loss</em>, or "
+         "<em>signal-flatten</em>."),
+    ]),
+    ("What the strategies look at", [
+        ("Candle",
+         "One hour of price as four numbers: where it opened, the highest it "
+         "went, the lowest, and where it closed. Bob only acts on candles that "
+         "have finished, never a half-formed one."),
+        ("EMA100 baseline",
+         "The average price over the last 100 hours, weighted towards recent "
+         "ones. Above it is an uptrend, below it a downtrend. The first thing "
+         "every strategy checks."),
+        ("Confluence",
+         "Requiring several independent indicators to agree before trading. Any "
+         "one indicator fires constantly and most of it is noise; demanding "
+         "agreement cuts it down to something worth acting on."),
+        ("RSI",
+         "Relative Strength Index, 0–100. How one-sided recent moves have been. "
+         "Above 55 counts as bullish here, below 45 bearish."),
+        ("MACD",
+         "Compares a fast and a slow average of price. Fast above slow means "
+         "momentum is upward."),
+        ("Stochastic",
+         "0–100. Where the price sits inside its recent high-to-low range. Near "
+         "100 means it is closing at the top of its range."),
+        ("MFI",
+         "Money Flow Index, 0–100. Like RSI but weighted by volume, so it asks "
+         "whether the money moving in matches the price moving up."),
+        ("ADX",
+         "0–100. How strongly a market is trending, in either direction. Below "
+         "the threshold the market is chopping sideways and Bob refuses to "
+         "trade it — chop is where trend systems bleed."),
+        ("ATR",
+         "Average True Range: how far this market typically moves in an hour. "
+         "Position size and stop distance are both scaled by it."),
+        ("Reads: long / short / chop / wait",
+         "What a strategy currently sees. <em>chop</em> means the trend filter "
+         "has ruled the market out; <em>wait</em> means it is trending but the "
+         "indicators do not agree yet."),
+    ]),
+    ("How risk is controlled", [
+        ("R / 2.5R",
+         "R is the amount risked on a trade. A 2.5R target aims to make two and "
+         "a half times what it risks — which is why Bob can win well under half "
+         "his trades and still come out ahead."),
+        ("Risk per trade",
+         "%s%% of the account on any single position. Equal risk everywhere, so "
+         "a volatile coin takes a smaller position than a calm one for the same "
+         "money at stake."),
+        ("Notional",
+         "The full size of a position. Capped at 1/%s of the account so nothing "
+         "can dominate."),
+        ("Max per side",
+         "At most %s longs and %s shorts at once. Crypto markets move together, "
+         "so twenty longs are closer to one big bet than twenty separate ones."),
+        ("Drawdown",
+         "How far the account has fallen from its highest point. Bob halts at "
+         "%s%%."),
+        ("Halt",
+         "Trading stops for %sh after %s losses in a row, or that drawdown. "
+         "Position size also halves after %s losses in a row, before the full "
+         "halt."),
+        ("Commission and slippage",
+         "%s%% and %s%% charged on every side of every trade. Slippage is the "
+         "gap between the price you asked for and the price you got. Both count "
+         "against Bob, so the numbers are not flattering themselves."),
+    ]),
+    ("Judging whether it works", [
+        ("Buy &amp; hold",
+         "What you would have if you simply bought all 32 coins in equal "
+         "amounts at the start and did nothing. The honest thing to compare "
+         "against: a strategy below this line lost money by being clever."),
+        ("Control / random entry",
+         "Five accounts that enter at random, with exactly the same markets, "
+         "stops, targets and sizing as the real strategies. The only difference "
+         "is that their entries carry no information. If the strategies cannot "
+         "beat these, the indicators are doing nothing and any profit came from "
+         "the risk rules instead."),
+        ("Why five controls",
+         "One random account is one roll of the dice and can look brilliant by "
+         "luck. Five give a range to place the real strategies inside."),
+        ("Per trade",
+         "Average profit or loss per closed trade. The fairest way to compare "
+         "accounts that trade at different rates."),
+        ("Win rate",
+         "Share of closed trades that made money. On its own it says very "
+         "little: a 2.5R target behind an ATR stop wins about 28%% of the time "
+         "on pure chance, so 30%% is not evidence of skill."),
+        ("t-statistic",
+         "How confident you can be that a result is not luck. Above 2 is the "
+         "usual bar. It shows as a dash until there are at least %s closed "
+         "trades, because on two or three it produces enormous numbers that "
+         "mean nothing."),
+        ("Evidence collected",
+         "Progress towards roughly %s closed trades per strategy, about where "
+         "returns start to be distinguishable from luck. Until then the "
+         "standings are entertainment."),
+        ("Paper trading",
+         "Simulated money on real prices. No exchange account, no orders, "
+         "nothing at risk. The prices and the costs are real; the money is not."),
+    ]),
+]
+
+_GLOSSARY_NUMBERS = (
+    pt.RISK_PCT, pt.MAX_CONCURRENT, pt.MAX_PER_SIDE, pt.MAX_PER_SIDE,
+    pt.MAX_DD_PCT, pt.HALT_COOLDOWN_HOURS, pt.MAX_CONSEC_LOSS,
+    pt.SOFT_LOSS_STREAK, pt.COMMISSION_PCT, pt.SLIPPAGE_PCT,
+    pt.MIN_T_TRADES, SIGNIFICANCE_TARGET,
+)
+
+
+def render_glossary():
+    """Definitions, with every number pulled from the live config rather than
+    typed in — a glossary that drifts from the code is worse than none."""
+    nums = list(_GLOSSARY_NUMBERS)
+    out = []
+    for group, items in GLOSSARY:
+        rows = []
+        for term, text in items:
+            n = text.count("%s")
+            if n:
+                text = text % tuple(nums[:n])
+                del nums[:n]
+            text = text.replace("%%", "%")
+            rows.append('<div class="gl"><dt>' + term + "</dt><dd>" + text
+                        + "</dd></div>")
+        out.append('\n  <section>\n    <div class="sec-head"><h2>' + group
+                   + '</h2></div>\n    <div class="sec-body">'
+                   + '<dl class="glossary">' + "".join(rows)
+                   + "</dl></div>\n  </section>")
+    assert not nums, "glossary placeholders and numbers are out of step"
+    return "".join(out)
+
+
 NAV = (("index.html", "Portfolio"), ("orders.html", "Orders"),
-       ("markets.html", "Markets"), ("research.html", "Research"))
+       ("markets.html", "Markets"), ("research.html", "Research"),
+       ("glossary.html", "Glossary"))
 
 
 def shell(title, active, body, meta, subtitle, script=""):
@@ -967,6 +1171,7 @@ SUB = {
                     "{n} markets.",
     "research.html": "Does either strategy actually beat random entry? Two "
                      "indicator books against {c} coin-flip books and buy-and-hold.",
+    "glossary.html": "What every number and label on this site actually means.",
 }
 
 
@@ -999,6 +1204,7 @@ def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None, out_dir=
         "orders.html": (sec["orders"], ""),
         "markets.html": (sec["chart"] + sec["signals"], sec["script"]),
         "research.html": (sec["verdict"] + sec["books"], ""),
+        "glossary.html": (render_glossary(), ""),
     }
     for name, (body, script) in pages.items():
         with open(os.path.join(out_dir, name), "w") as f:
@@ -1007,7 +1213,8 @@ def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None, out_dir=
 
     # Single file: every section, no nav, for a one-page host.
     one = (sec["summary"] + sec["positions"] + sec["equity"] + sec["chart"]
-           + sec["orders"] + sec["verdict"] + sec["books"] + sec["signals"])
+           + sec["orders"] + sec["verdict"] + sec["books"] + sec["signals"]
+           + render_glossary())
     with open(out_file, "w") as f:
         f.write(shell("Bob", None, one, meta, sub("index.html"), sec["script"]))
     return out_file, len(trades), len(state)
