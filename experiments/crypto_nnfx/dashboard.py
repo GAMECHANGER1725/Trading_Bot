@@ -99,7 +99,15 @@ def strategy_stats(trades, state):
         wins = [p for p in pnls if p > 0]
         losses = [p for p in pnls if p <= 0]
         gross_win, gross_loss = sum(wins), abs(sum(losses))
-        equity = acct.get("cash_equity", pt.INITIAL_CAPITAL)
+        cash = acct.get("cash_equity", pt.INITIAL_CAPITAL)
+        # Mark to market. Cash alone shows a flat $10,000 for a book holding
+        # seven open positions, which reads as "this book has done nothing".
+        unreal = 0.0
+        for q in acct.get("positions", {}).values():
+            d = ((q["last"] - q["entry"]) if q["side"] == "long"
+                 else (q["entry"] - q["last"]))
+            unreal += d * q["qty"]
+        equity = cash + unreal
         mean = sum(pnls) / len(pnls) if pnls else 0.0
         # Sample t-stat on mean trade P&L — the honest read on whether any
         # apparent edge is distinguishable from noise at this sample size.
@@ -109,7 +117,8 @@ def strategy_stats(trades, state):
             se = math.sqrt(var / len(pnls)) if var > 0 else 0.0
             t_stat = mean / se if se > 0 else None
         stats[strat] = {
-            "equity": equity, "base": pt.INITIAL_CAPITAL,
+            "equity": equity, "cash": cash, "unrealised": unreal,
+            "base": pt.INITIAL_CAPITAL,
             "return_pct": (equity / pt.INITIAL_CAPITAL - 1) * 100,
             "trades": len(ts), "wins": len(wins), "losses": len(losses),
             "win_rate": len(wins) / len(ts) * 100 if ts else 0.0,
@@ -415,6 +424,7 @@ def build_html(state, trades, live, generated, bench=None):
         # mean, not median: early on most books sit at exactly the starting
         # figure, so the median is whichever one has not traded yet
         c_eq = sum(c["equity"] for c in cs) / len(cs)
+        c_open = sum(len(c["positions"]) for c in cs)
         c_wins = sum(c["wins"] for c in cs)
         cards.append(f"""
       <div class="card s0">
@@ -424,8 +434,10 @@ def build_html(state, trades, live, generated, bench=None):
             <span class="v num">{fmt_money(c_eq)}</span></div>
           <div class="fig"><span class="lbl">Mean return</span>
             <span class="v num {cls_for((c_eq / pt.INITIAL_CAPITAL - 1) * 100)}">{fmt_pct((c_eq / pt.INITIAL_CAPITAL - 1) * 100)}</span></div>
-          <div class="fig"><span class="lbl">Trades</span>
+          <div class="fig"><span class="lbl">Closed</span>
             <span class="v num sm">{c_trades}</span></div>
+          <div class="fig"><span class="lbl">Open</span>
+            <span class="v num sm">{c_open} <span class="mut" style="font-size:12px">pos</span></span></div>
           <div class="fig"><span class="lbl">Win rate</span>
             <span class="v num sm">{c_wins / c_trades * 100 if c_trades else 0:.0f}%</span></div>
           <div class="fig"><span class="lbl">Per trade</span>
@@ -439,8 +451,6 @@ def build_html(state, trades, live, generated, bench=None):
     for strat in REAL:
         s = stats[strat]
         key = SERIES[strat]
-        pf = ("∞" if s["profit_factor"] == float("inf")
-              else f"{s['profit_factor']:.2f}" if s["trades"] else "—")
         t_txt = f"{s['t_stat']:.2f}" if s["t_stat"] is not None else "—"
         cards.append(f"""
       <div class="card {key}">
@@ -454,8 +464,10 @@ def build_html(state, trades, live, generated, bench=None):
             <span class="v num sm">{s['trades']}</span></div>
           <div class="fig"><span class="lbl">Win rate</span>
             <span class="v num sm">{s['win_rate']:.0f}%</span></div>
-          <div class="fig"><span class="lbl">Profit factor</span>
-            <span class="v num sm">{pf}</span></div>
+          <div class="fig"><span class="lbl">Open</span>
+            <span class="v num sm">{len(s['positions'])} <span class="mut" style="font-size:12px">pos</span></span></div>
+          <div class="fig"><span class="lbl">Unrealised</span>
+            <span class="v num sm {cls_for(s['unrealised'])}">{fmt_money(s['unrealised'])}</span></div>
           <div class="fig"><span class="lbl">t-stat</span>
             <span class="v num sm mut">{t_txt}</span></div>
         </div>

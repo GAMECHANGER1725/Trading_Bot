@@ -666,10 +666,22 @@ def report(path=STATE_FILE):
     print(f"\n{BOT_NAME} — {len(SYMBOLS)} markets, {INTERVAL} candles\n")
     print(f"{'book':16} {'equity':>11} {'return':>8} {'vs hold':>9} "
           f"{'W/L':>8} {'per trade':>11} {'t':>6} {'open':>5} {'halt':>5}")
+    print(f"{'':16} {'(incl. open positions)':>11}")
     print("-" * 88)
 
-    def line(label, st):
-        eq, w, l = st["cash_equity"], st.get("wins", 0), st.get("losses", 0)
+    def mtm(st):
+        """Cash plus unrealised P&L. Cash alone reads as a flat $10,000 for a
+        book holding seven open positions, which looks like it has done nothing."""
+        total = st["cash_equity"]
+        for q in st.get("positions", {}).values():
+            delta = ((q["last"] - q["entry"]) if q["side"] == "long"
+                     else (q["entry"] - q["last"]))
+            total += delta * q["qty"]
+        return total
+
+    def line(label, st, equity=None):
+        eq = mtm(st) if equity is None else equity
+        w, l = st.get("wins", 0), st.get("losses", 0)
         ret = (eq / INITIAL_CAPITAL - 1) * 100
         mean, se, t = expectancy(st.get("pnls", []))
         halt = "yes" if st.get("halted_until_ms", 0) > time.time() * 1000 else "no"
@@ -694,7 +706,10 @@ def report(path=STATE_FILE):
                           for k, v in st.get("positions", {}).items()},
             "halted_until_ms": max(st.get("halted_until_ms", 0) for st in ctrls),
         }
-        total += line(f"control x{len(ctrls)}", agg)
+        # mean of each book's own mark-to-market. Pooling the positions onto one
+        # mean cash figure would add five books' unrealised P&L to one account.
+        total += line(f"control x{len(ctrls)}", agg,
+                      equity=sum(mtm(st) for st in ctrls) / len(ctrls))
         print(f"{'':16} {'(pooled across ' + str(len(ctrls)) + ' random-entry books)':>50}")
     for name in REAL_BOOKS:
         if name in saved:
