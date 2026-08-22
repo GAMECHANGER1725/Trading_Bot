@@ -114,7 +114,8 @@ def live_prices():
     out = {}
     for sym in pt.SYMBOLS:
         try:
-            bars = pt.fetch_klines(sym)[:-1]
+            raw = pt.fetch_klines(sym)
+            bars = raw[:-1]
             ind = pt.compute_indicators(bars)
             i = len(bars) - 1
             reads = {}
@@ -123,7 +124,8 @@ def live_prices():
                 reads[name] = ("long" if long_ok else "short" if short_ok else
                                "chop" if not trending else "wait")
             out[sym] = {
-                "price": ind["close"][i], "ema": ind["ema"][100][i],
+                "price": ind["close"][i], "now": raw[-1]["close"],
+                "ema": ind["ema"][100][i],
                 "rsi": ind["rsi"][i], "stoch": ind["stoch"][i], "mfi": ind["mfi"][i],
                 "adx": ind["adx"][i], "atr": ind["atr"][i], "reads": reads,
                 "hist": [round(c, 8) for c in ind["close"][-pt.CHART_BARS:]],
@@ -134,7 +136,7 @@ def live_prices():
     return out
 
 
-def strategy_stats(trades, state):
+def strategy_stats(trades, state, live=None):
     """Aggregate per strategy: equity, returns, win/loss, profit factor, t-stat."""
     stats = {}
     for strat in pt.STRATEGIES:
@@ -148,9 +150,11 @@ def strategy_stats(trades, state):
         # Mark to market. Cash alone shows a flat $10,000 for a book holding
         # seven open positions, which reads as "this book has done nothing".
         unreal = 0.0
-        for q in acct.get("positions", {}).values():
-            d = ((q["last"] - q["entry"]) if q["side"] == "long"
-                 else (q["entry"] - q["last"]))
+        for sym_, q in acct.get("positions", {}).items():
+            mark = ((live or {}).get(sym_, {}).get("now")
+                    or (live or {}).get(sym_, {}).get("price") or q["last"])
+            d = ((mark - q["entry"]) if q["side"] == "long"
+                 else (q["entry"] - mark))
             unreal += d * q["qty"]
         equity = cash + unreal
         mean = sum(pnls) / len(pnls) if pnls else 0.0
@@ -481,7 +485,7 @@ def cls_for(v):
 
 
 def build_html(state, trades, live, generated, bench=None, orders=None):
-    stats = strategy_stats(trades, state)
+    stats = strategy_stats(trades, state, live)
     orders = orders or []
     totals = portfolio_totals(stats, orders)
     curves = equity_curves(trades, state)
@@ -641,7 +645,7 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
     for strat, st in ((k, stats[k]) for k in REAL if k in stats):
         for sym, pos in sorted(st["positions"].items()):
             d = live.get(sym, {})
-            price = d.get("price") or pos.get("last") or pos["entry"]
+            price = d.get("now") or d.get("price") or pos.get("last") or pos["entry"]
             delta = ((price - pos["entry"]) if pos["side"] == "long"
                      else (pos["entry"] - price))
             pnl = delta * pos["qty"]

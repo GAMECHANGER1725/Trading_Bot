@@ -786,6 +786,12 @@ def main():
             last = len(closed) - 1
             live[symbol] = {
                 "price": ind["close"][last],
+                # The still-forming candle, for DISPLAY only. Trading decisions
+                # and the halt logic stay on closed candles -- marking to an
+                # unclosed bar would let a wick trip a drawdown halt. But a page
+                # that only moves once an hour looks frozen, and the position
+                # P&L a reader wants is the one at the current price.
+                "now": bars[-1]["close"],
                 "ema": ind["ema"][STRATEGIES["v1_rsi_macd"]["baseline_len"]][last],
                 "rsi": ind["rsi"][last], "stoch": ind["stoch"][last],
                 "mfi": ind["mfi"][last], "adx": ind["adx"][last],
