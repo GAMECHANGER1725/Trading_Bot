@@ -576,6 +576,21 @@ class Benchmark:
 
 # ============================== statistics ==============================
 
+# A t-statistic on a handful of trades is not a weak signal, it is a wrong one.
+# Two trades that happen to land near each other give a near-zero standard error
+# and a t in the hundreds: on 23 Aug v2 showed t = 610.63 on two wins of $31.12
+# and $31.22. Below this many trades the figure is suppressed rather than shown
+# small, because a number that looks like evidence is worse than a blank.
+MIN_T_TRADES = 10
+
+
+def fmt_t(pnls):
+    """t as text, or an em dash while the sample is too small to mean anything."""
+    if len(pnls) < MIN_T_TRADES:
+        return "—"
+    return f"{expectancy(pnls)[2]:.2f}"
+
+
 def expectancy(pnls):
     """(mean, standard error, t) on per-trade P&L. t is the only honest way to
     ask whether a return is distinguishable from luck."""
@@ -720,10 +735,11 @@ def report(path=STATE_FILE):
         eq = mtm(st) if equity is None else equity
         w, l = st.get("wins", 0), st.get("losses", 0)
         ret = (eq / INITIAL_CAPITAL - 1) * 100
-        mean, se, t = expectancy(st.get("pnls", []))
+        pnls = st.get("pnls", [])
+        mean, se, _ = expectancy(pnls)
         halt = "yes" if st.get("halted_until_ms", 0) > time.time() * 1000 else "no"
         print(f"{label:16} ${eq:>10,.2f} {ret:>7.2f}% {ret - bench_ret:>8.2f}% "
-              f"{f'{w}/{l}':>8} {f'{mean:+.2f}':>11} {t:>6.2f} "
+              f"{f'{w}/{l}':>8} {f'{mean:+.2f}':>11} {fmt_t(pnls):>6} "
               f"{len(st.get('positions', {})):>5} {halt:>5}")
         return w + l
 
@@ -1164,6 +1180,13 @@ def selftest():  # noqa: C901 - a flat list of asserts reads better than helpers
     m, se, t = expectancy([5.0, 5.0, 5.0, -1.0])
     assert t > 0 and se > 0, "positive mean gives positive t"
     assert expectancy([]) == (0.0, 0.0, 0.0), "empty is safe"
+
+    # ---- t is suppressed until the sample can support it ----
+    assert fmt_t([31.12, 31.22]) == "—", "two near-identical trades must not print a t"
+    assert fmt_t([1.0] * (MIN_T_TRADES - 1)) == "—", "just under the bar is still blank"
+    assert fmt_t([1.0, -1.0] * MIN_T_TRADES) != "—", "enough trades and t appears"
+    sample = [5.0, 5.0, 5.0, -1.0] * 5          # fmt_t rounds to 2dp
+    assert abs(float(fmt_t(sample)) - expectancy(sample)[2]) < 0.005
 
     # ---- benchmark ----
     b = Benchmark()

@@ -162,7 +162,7 @@ def strategy_stats(trades, state, live=None):
         # Sample t-stat on mean trade P&L — the honest read on whether any
         # apparent edge is distinguishable from noise at this sample size.
         t_stat, se = None, 0.0
-        if len(pnls) > 2:
+        if len(pnls) >= pt.MIN_T_TRADES:
             var = sum((p - mean) ** 2 for p in pnls) / (len(pnls) - 1)
             se = math.sqrt(var / len(pnls)) if var > 0 else 0.0
             t_stat = mean / se if se > 0 else None
