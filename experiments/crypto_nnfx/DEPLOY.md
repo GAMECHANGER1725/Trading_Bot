@@ -1,4 +1,27 @@
-# Putting the dashboard on the web (Vercel)
+# The dashboard on the web
+
+**Live now: https://gamechanger1725.github.io/Trading_Bot/**
+
+Served by GitHub Pages from the `bob-live` branch, which Bob rewrites and
+force-pushes every ten minutes. Nothing to run; a push is a deploy.
+
+GitHub Pages rather than Vercel because Vercel has no non-interactive signup —
+it needs a browser login that only the account holder can do. Pages was
+reachable with the `gh` credentials already on this machine, so it is deployed
+rather than documented. The Vercel route below still works if you want it, and
+the same branch serves both.
+
+TradingView loads on this host, so the real widgets appear there. See the
+TradingView section at the bottom for why the Claude artifact copy differs.
+
+## Build rate
+
+`GITHUB_PUSH_INTERVAL` is 600s. Every force-push triggers a Pages rebuild and
+Pages allows roughly ten an hour, so a five-minute sync would throttle and the
+site would fall behind exactly when it looked most current. Six an hour is
+comfortably under, and on 1h candles a ten-minute-old page is not stale.
+
+## Alternative: Vercel
 
 The `bob-live` branch of this repo *is* the website. Bob rewrites `index.html`
 there every 5 minutes and force-pushes, so a host watching that branch

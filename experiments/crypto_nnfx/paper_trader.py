@@ -68,7 +68,11 @@ STATE_FILE = "paper_state.json"
 # keeping, and a fresh commit every few minutes would spam the repo forever.
 GITHUB_SYNC_WORKTREE = "/Users/vaidikpatel/Downloads/Home/Trading_Bot/.bob-live-worktree"
 GITHUB_SYNC_BRANCH = "bob-live"
-GITHUB_PUSH_INTERVAL = 300  # seconds; independent of the trading poll cadence
+# 600s, not 300: every force-push to bob-live triggers a GitHub Pages rebuild,
+# and Pages allows roughly 10 builds an hour. Twelve would throttle and the site
+# would fall behind exactly when it looked most current. Six is comfortably
+# under, and on 1h candles a ten-minute page is not stale.
+GITHUB_PUSH_INTERVAL = 600  # seconds; independent of the trading poll cadence
 
 # ---- Shared risk boilerplate (identical across strategies, so the comparison
 # ---- isolates the entry signal rather than the risk model) ----
