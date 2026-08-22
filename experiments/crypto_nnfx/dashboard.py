@@ -19,12 +19,13 @@ import paper_trader as pt
 OUT_FILE = "dashboard.html"
 SIGNIFICANCE_TARGET = 100  # trades per strategy before the comparison means much
 
-SERIES = {"v0_control": "s0", "v1_rsi_macd": "s1", "v2_stoch_mfi": "s2"}
-LABEL = {"v0_control": "Control · random entry",
+CONTROLS = pt.CONTROL_BOOKS
+SHOWN = pt.REAL_BOOKS + pt.CONTROL_BOOKS[:1]   # one control column is enough
+REAL = pt.REAL_BOOKS
+SERIES = {**{k: "s0" for k in CONTROLS}, "v1_rsi_macd": "s1", "v2_stoch_mfi": "s2"}
+LABEL = {**{k: f"Control {i + 1} · random entry" for i, k in enumerate(CONTROLS)},
          "v1_rsi_macd": "V1 · RSI + MACD",
          "v2_stoch_mfi": "V2 · Stochastic + MFI"}
-CONTROL = "v0_control"
-REAL = [k for k in SERIES if k != CONTROL]
 
 
 # ------------------------------ data ------------------------------
@@ -356,62 +357,80 @@ def build_html(state, trades, live, generated, bench=None):
     ranked = sorted(((k, v) for k, v in stats.items() if k in REAL),
                     key=lambda kv: kv[1]["avg_trade"], reverse=True)
     lead = ranked[0]
-    ctrl = stats.get(CONTROL)
+    ctrl_means = sorted(stats[k]["avg_trade"] for k in CONTROLS
+                        if stats.get(k, {}).get("trades", 0) >= 2)
+    ctrl_n = sum(stats.get(k, {}).get("trades", 0) for k in CONTROLS)
     bench_ret = (bench / pt.INITIAL_CAPITAL - 1) * 100 if bench else None
-
-    def welch(a, b):
-        """t on the difference of two mean-P&L figures. Two independent books,
-        unequal variance and unequal n, so Welch rather than a pooled test."""
-        if not a or not b or a["trades"] < 2 or b["trades"] < 2:
-            return None
-        sa, sb = a.get("se"), b.get("se")
-        if not sa or not sb:
-            return None
-        return (a["avg_trade"] - b["avg_trade"]) / math.sqrt(sa ** 2 + sb ** 2)
-
-    vs_ctrl = welch(lead[1], ctrl)
-    min_real = min(s_["trades"] for k, s_ in ranked)
-    ctrl_n = ctrl["trades"] if ctrl else 0
+    min_real = min(s_["trades"] for _, s_ in ranked)
+    beaten = (sum(1 for c in ctrl_means if lead[1]["avg_trade"] > c)
+              if ctrl_means else 0)
 
     if total_trades == 0:
         headline = "Waiting for the first trade"
-        body = ("Three books are loaded across 32 markets: two entering on "
-                "indicator confluence, one entering at random as a control. "
-                "Entries fire only on a closed candle.")
+        body = (f"Seven books are loaded across {len(pt.SYMBOLS)} markets: two "
+                f"entering on indicator confluence and {len(CONTROLS)} entering at "
+                "random, all sharing one risk model. Entries fire only on a closed "
+                "candle.")
     elif min_real < 10 or ctrl_n < 10:
         headline = "Too early to read"
-        body = (f"{total_trades} trades across all three books. At this sample the "
-                "standings are noise — a single trade reorders them. The number "
-                "worth watching is the trade count, not the returns.")
-    elif vs_ctrl is None:
+        body = (f"{total_trades} trades so far. At this sample the standings are "
+                "noise — a single trade reorders them. The number worth watching "
+                "is the trade count, not the returns.")
+    elif not ctrl_means:
         headline = f"{LABEL[lead[0]]} leads on expectancy"
-        body = ("Not yet enough closed trades in the control book to say whether "
-                "that lead means anything.")
+        body = "Not enough closed trades in the control books to say if that means anything."
     else:
-        beats_ctrl = vs_ctrl > 2
-        headline = (f"{LABEL[lead[0]]} beats random entry"
-                    if beats_ctrl else "No book has beaten random entry")
+        clears = beaten == len(ctrl_means)
+        headline = (f"{LABEL[lead[0]]} beats every random book"
+                    if clears else "No book has beaten random entry")
         body = (
-            f"Best book averages {fmt_money(lead[1]['avg_trade'])} per trade against "
-            f"{fmt_money(ctrl['avg_trade'])} for coin-flip entries on the same "
-            f"markets and the same risk model — a difference of t = {vs_ctrl:.2f}. ")
-        body += ("That clears the |t| > 2 bar, so the entry signal is doing "
-                 "measurable work."
-                 if beats_ctrl else
-                 "Below the |t| > 2 bar, so on the evidence so far the indicators "
-                 "are not distinguishable from noise and the results are the risk "
-                 "model, not the signal.")
+            f"The best strategy averages {fmt_money(lead[1]['avg_trade'])} per trade. "
+            f"{len(ctrl_means)} coin-flip books on the same markets, with the same "
+            f"stops, targets and sizing, range from {fmt_money(ctrl_means[0])} to "
+            f"{fmt_money(ctrl_means[-1])} — it beats {beaten} of them. ")
+        body += ("Sitting above the whole range is the first real sign the entry "
+                 "signal does something."
+                 if clears else
+                 "Landing inside that range means the indicators are not "
+                 "distinguishable from chance, and whatever the books have earned "
+                 "came from the risk model rather than the signal.")
         if bench_ret is not None:
             best_ret = max(s_["return_pct"] for _, s_ in ranked)
-            body += (f" Buy-and-hold on the same basket returned {fmt_pct(bench_ret)} "
-                     f"over the same window, against {fmt_pct(best_ret)} for the "
-                     f"best book.")
+            body += (f" Holding the same basket returned {fmt_pct(bench_ret)} over "
+                     f"the same window, against {fmt_pct(best_ret)} for the best book.")
 
     pct_done = min(total_trades / (SIGNIFICANCE_TARGET * 2) * 100, 100)
 
     # --- strategy cards ---
     cards = []
-    for strat, s in stats.items():
+    cs = [stats[k] for k in CONTROLS if k in stats]
+    if cs:
+        c_trades = sum(c["trades"] for c in cs)
+        c_means = sorted(c["avg_trade"] for c in cs)
+        c_eq = sorted(c["equity"] for c in cs)[len(cs) // 2]
+        c_wins = sum(c["wins"] for c in cs)
+        cards.append(f"""
+      <div class="card s0">
+        <h3><span class="swatch" style="background:var(--s0)"></span>Control &times;{len(cs)} &middot; random entry</h3>
+        <div class="figures">
+          <div class="fig"><span class="lbl">Median equity</span>
+            <span class="v num">{fmt_money(c_eq)}</span></div>
+          <div class="fig"><span class="lbl">Median return</span>
+            <span class="v num {cls_for((c_eq / pt.INITIAL_CAPITAL - 1) * 100)}">{fmt_pct((c_eq / pt.INITIAL_CAPITAL - 1) * 100)}</span></div>
+          <div class="fig"><span class="lbl">Trades</span>
+            <span class="v num sm">{c_trades}</span></div>
+          <div class="fig"><span class="lbl">Win rate</span>
+            <span class="v num sm">{c_wins / c_trades * 100 if c_trades else 0:.0f}%</span></div>
+          <div class="fig"><span class="lbl">Per trade</span>
+            <span class="v num sm">{fmt_money(c_means[0]) if c_means else '—'} to {fmt_money(c_means[-1]) if c_means else '—'}</span></div>
+        </div>
+        <p class="card-note">Coin-flip entries, same markets and same risk model.
+          A 2.5R target behind an ATR stop already wins about 28% of the time on
+          chance alone, so this is the line a real strategy has to clear.</p>
+      </div>""")
+
+    for strat in REAL:
+        s = stats[strat]
         key = SERIES[strat]
         pf = ("∞" if s["profit_factor"] == float("inf")
               else f"{s['profit_factor']:.2f}" if s["trades"] else "—")
@@ -488,7 +507,7 @@ def build_html(state, trades, live, generated, bench=None):
         bias = "above" if d["price"] > d["ema"] else "below"
         reads = "".join(
             f'<td><span class="tag {d["reads"][s2]}">{d["reads"][s2]}</span></td>'
-            for s2 in pt.STRATEGIES)
+            for s2 in SHOWN)
         sig_rows.append(f"""
         <tr><td class="num">{html.escape(sym.replace("USDT", ""))}</td>
         <td class="num">{d['price']:,.6g}</td>
@@ -518,7 +537,7 @@ def build_html(state, trades, live, generated, bench=None):
 
     legend = "".join(
         f'<span><span class="swatch" style="background:var(--{SERIES[s]})"></span>'
-        f'{html.escape(LABEL[s])}</span>' for s in pt.STRATEGIES)
+        f'{html.escape(LABEL[s])}</span>' for s in SHOWN)
 
     return f"""<title>Bob</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -577,7 +596,7 @@ def build_html(state, trades, live, generated, bench=None):
     <div class="scroll"><table>
       <thead><tr><th>Market</th><th>Price</th><th>Trend</th><th>RSI</th><th>Stoch</th>
         <th>MFI</th><th>ADX</th>
-        {"".join(f'<th>{html.escape(LABEL[s].split(chr(183))[0].strip())}</th>' for s in pt.STRATEGIES)}
+        {"".join(f'<th>{html.escape(LABEL[s].split(chr(183))[0].strip())}</th>' for s in SHOWN)}
       </tr></thead>
       <tbody>{"".join(sig_rows)}</tbody></table></div>
   </section>

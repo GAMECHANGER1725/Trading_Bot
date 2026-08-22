@@ -82,10 +82,14 @@ def show(title, pfs, bench):
     print(f"{'buy & hold':16} ${be:>10,.2f} "
           f"{(be / pt.INITIAL_CAPITAL - 1) * 100:>7.2f}%")
 
-    cm, cse, _ = res.get("v0_control", (0, 0, 0))
-    print("\nvs random entry (Welch t on the difference in mean P&L):")
+    ctrls = [v for k, v in res.items() if k in pt.CONTROL_BOOKS]
+    if not ctrls:
+        return res
+    cm = sorted(c[0] for c in ctrls)[len(ctrls) // 2]
+    cse = max(c[1] for c in ctrls)
+    print(f"\nvs random entry (median of {len(ctrls)} control books, Welch t):")
     for name, (m, se, _) in sorted(res.items()):
-        if name == "v0_control":
+        if name in pt.CONTROL_BOOKS:
             continue
         if not (se and cse):
             print(f"  {name:14} too few trades to compare")
@@ -98,10 +102,11 @@ def show(title, pfs, bench):
 
 def control_sweep(series, lo, hi, n_controls):
     """Rank each real strategy against a population of random-entry books."""
-    base = pt.STRATEGIES["v0_control"]
+    base = pt.STRATEGIES[pt.CONTROL_BOOKS[0]]
+    for k in pt.CONTROL_BOOKS:
+        pt.STRATEGIES.pop(k, None)
     for k in range(n_controls):
         pt.STRATEGIES[f"ctrl{k:02d}"] = {**base, "seed": k + 1}
-    pt.STRATEGIES.pop("v0_control", None)
     pfs, bench = run(series, lo, hi)
 
     ctrl = sorted(pt.expectancy(p.pnls)[0]

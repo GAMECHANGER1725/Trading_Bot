@@ -12,7 +12,7 @@ one risk model, one $10k account each, across 32 markets:
 
 | book | entry rule |
 |---|---|
-| `v0_control` | **coin flip**, same regime gate, same everything else |
+| `ctrl0`..`ctrl4` | **coin flip** x5, same regime gate, same everything else |
 | `v1_rsi_macd` | EMA100 baseline + RSI + MACD confluence, ADX>20 |
 | `v2_stoch_mfi` | EMA100 baseline + Stochastic + MFI confluence, ADX>15 |
 
@@ -35,7 +35,7 @@ measured win rate was 30.4%. So "Bob wins 30% of his trades" was never evidence
 of anything, and for the first day of running there was nothing in the system
 capable of noticing that.
 
-`v0_control` enters at random on the same markets, through the same regime
+Five control books enter at random on the same markets, through the same regime
 filter, with the same stops, targets and sizing. The only difference is whether
 the entry carries information. `STATUS.md` has required this test since the
 XGBoost work ("shuffle-control every new feature block; if permuted values score
@@ -54,6 +54,10 @@ Replay over 15 days of 1h candles, 32 markets, current rules:
 | `v1_rsi_macd` | −0.02% | 35/122 | 22.3% | −0.01 | −0.01 |
 | `v2_stoch_mfi` | +0.41% | 47/127 | 27.0% | +0.23 | 0.25 |
 | **buy & hold** | **+30.79%** | | | | |
+
+**Five live controls, not one**, for the same reason the replay uses thirty: a
+single coin-flip book is a single draw. The dashboard and `--report` collapse
+them to one row and place each real strategy inside their range.
 
 ### One control is not enough
 

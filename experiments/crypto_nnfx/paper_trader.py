@@ -115,6 +115,12 @@ WARMUP_BARS = 150
 # the whole edge is the risk model. STATUS.md already requires this test
 # ("shuffle-control every new feature block"); it had never been applied to Bob.
 CONTROL_ENTRY_P = 0.10   # per trending bar; frequency need not match, expectancy does
+# Five control books, not one. A single coin-flip book is itself a single draw:
+# with a 5% tail roughly one seed in twenty clears |t| > 2 on nothing at all,
+# and the first seed tried in the 22 Aug replay did exactly that (t = 2.21).
+# Comparing one strategy against one control also doubles the noise. Five gives
+# a range to place the real books inside, at no cost but five more dicts.
+N_CONTROLS = 5
 
 
 # ============================== data feed ==============================
@@ -310,10 +316,6 @@ def signal_control(ind, i, cfg):
 
 
 STRATEGIES = {
-    "v0_control": {
-        "signal": signal_control, "baseline_len": 100, "adx_min": 20,
-        "entry_p": CONTROL_ENTRY_P, "seed": 0,
-    },
     "v1_rsi_macd": {
         "signal": signal_v1, "baseline_len": 100, "adx_min": 20,
         "rsi_long": 55, "rsi_short": 45,
@@ -323,6 +325,27 @@ STRATEGIES = {
         "stoch_long": 55, "stoch_short": 45, "mfi_long": 55, "mfi_short": 40,
     },
 }
+
+
+# Control books first, so they read as the baseline the real books are measured
+# against rather than as competitors.
+STRATEGIES = {
+    **{f"ctrl{k}": {"signal": signal_control, "baseline_len": 100, "adx_min": 20,
+                    "entry_p": CONTROL_ENTRY_P, "seed": k}
+       for k in range(N_CONTROLS)},
+    **STRATEGIES,
+}
+CONTROL_BOOKS = [f"ctrl{k}" for k in range(N_CONTROLS)]
+REAL_BOOKS = [k for k in STRATEGIES if k not in CONTROL_BOOKS]
+
+
+def control_range(state):
+    """(worst, median, best) mean P&L per trade across the live control books."""
+    means = sorted(expectancy(state.get(k, {}).get("pnls", []))[0]
+                   for k in CONTROL_BOOKS if state.get(k, {}).get("pnls"))
+    if not means:
+        return None
+    return means[0], means[len(means) // 2], means[-1]
 
 
 def compute_indicators(closed, symbol=""):
@@ -644,26 +667,51 @@ def report(path=STATE_FILE):
     print(f"{'book':16} {'equity':>11} {'return':>8} {'vs hold':>9} "
           f"{'W/L':>8} {'per trade':>11} {'t':>6} {'open':>5} {'halt':>5}")
     print("-" * 88)
-    total = 0
-    for name, st in sorted(saved.items()):
+
+    def line(label, st):
         eq, w, l = st["cash_equity"], st.get("wins", 0), st.get("losses", 0)
         ret = (eq / INITIAL_CAPITAL - 1) * 100
         mean, se, t = expectancy(st.get("pnls", []))
         halt = "yes" if st.get("halted_until_ms", 0) > time.time() * 1000 else "no"
-        print(f"{name:16} ${eq:>10,.2f} {ret:>7.2f}% {ret - bench_ret:>8.2f}% "
+        print(f"{label:16} ${eq:>10,.2f} {ret:>7.2f}% {ret - bench_ret:>8.2f}% "
               f"{f'{w}/{l}':>8} {f'{mean:+.2f}':>11} {t:>6.2f} "
               f"{len(st.get('positions', {})):>5} {halt:>5}")
-        total += w + l
+        return w + l
+
+    total = 0
+    # controls collapse to one row: they are the yardstick, not competitors
+    ctrls = [saved[k] for k in CONTROL_BOOKS if k in saved]
+    if ctrls:
+        med = sorted(ctrls, key=lambda st: st["cash_equity"])[len(ctrls) // 2]
+        total += sum(st.get("wins", 0) + st.get("losses", 0) for st in ctrls)
+        line(f"control x{len(ctrls)}", med)
+        print(f"{'':16} {'(median of ' + str(len(ctrls)) + ' random-entry books)':>50}")
+    for name in REAL_BOOKS:
+        if name in saved:
+            total += line(name, saved[name])
     print("-" * 88)
     print(f"{'buy & hold':16} ${bench_eq:>10,.2f} {bench_ret:>7.2f}%   "
           f"(equal-weight, same 32 markets, same start)")
 
-    ctrl = saved.get("v0_control", {})
-    if ctrl:
-        cm, _, _ = expectancy(ctrl.get("pnls", []))
-        print(f"\ncontrol enters at random. Any book whose per-trade P&L is not "
-              f"clearly\nabove {cm:+.2f} has shown no evidence its indicators do "
-              f"anything.")
+    rng = control_range(saved)
+    if rng:
+        worst, med_m, best = rng
+        print(f"\nrandom entry, {len(ctrls)} books:  worst {worst:+.2f}   "
+              f"median {med_m:+.2f}   best {best:+.2f} per trade")
+        for name in REAL_BOOKS:
+            st = saved.get(name, {})
+            if not st.get("pnls"):
+                continue
+            m = expectancy(st["pnls"])[0]
+            beaten = sum(1 for k in CONTROL_BOOKS
+                         if saved.get(k, {}).get("pnls")
+                         and m > expectancy(saved[k]["pnls"])[0])
+            flag = "above every control" if beaten == len(ctrls) else "inside chance"
+            print(f"  {name:14} {m:+.2f}  beats {beaten}/{len(ctrls)} — {flag}")
+        print("A book that does not sit above every control book has shown no "
+              "evidence\nits indicators do anything the risk model was not "
+              "already doing.")
+
     print(f"\ntotal closed trades: {total}")
     if total < 200:
         print(f"need ~{200 - total} more before the comparison means much "
@@ -996,7 +1044,7 @@ def selftest():  # noqa: C901 - a flat list of asserts reads better than helpers
     assert Portfolio.fill(100, "short", False) > 100, "close short buys back higher"
 
     # ---- control book ----
-    cfg = STRATEGIES["v0_control"]
+    cfg = STRATEGIES[CONTROL_BOOKS[0]]
     ind = {"symbol": "BTCUSDT", "close": [100.0] * 300,
            "ema": {100: [50.0] * 300}, "adx": [30.0] * 300,
            "bar_ms": [i * 3_600_000 for i in range(300)]}
@@ -1015,6 +1063,14 @@ def selftest():  # noqa: C901 - a flat list of asserts reads better than helpers
     longs = sum(1 for f in entries if f[0])
     assert 0.25 < longs / len(entries) < 0.75, "control direction is a fair coin"
     assert not any(f[0] and f[1] for f in fires), "never long and short at once"
+    # different seeds must give genuinely different books, or five controls are
+    # one control counted five times
+    others = [[signal_control(ind, i, STRATEGIES[k], ) for i in range(300)]
+              for k in CONTROL_BOOKS[1:]]
+    assert all(o != fires for o in others), "each control seed is a distinct book"
+    assert len({tuple(map(tuple, o)) for o in others}) == len(others), \
+        "control seeds do not collide with each other"
+
     chop = dict(ind, adx=[5.0] * 300)
     assert not any(signal_control(chop, i, cfg)[:2] != (False, False) for i in range(300)), \
         "control respects the same regime filter as the real books"
