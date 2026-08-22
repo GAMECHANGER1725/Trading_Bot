@@ -106,6 +106,7 @@ COMMISSION_PCT = 0.05    # per side, matches backtest parity profile
 # an adverse half-tick per side makes every number below worse and true.
 SLIPPAGE_PCT = 0.02      # per side, always against us
 WARMUP_BARS = 150
+CHART_BARS = 96          # 4 days of hourly closes, enough to read a position
 
 # The control book. A 2.5R target with an ATR stop already wins ~28% of the time
 # on pure chance, and the measured rate is 30.4% — so "Bob wins 30%" is not by
@@ -625,11 +626,13 @@ def sync_dashboard_to_github(dashboard_path="dashboard.html"):
     try:
         if not os.path.isdir(GITHUB_SYNC_WORKTREE):
             return False
-        dest = os.path.join(GITHUB_SYNC_WORKTREE, "dashboard.html")
-        shutil.copy(dashboard_path, dest)
+        shutil.copy(dashboard_path, os.path.join(GITHUB_SYNC_WORKTREE, "dashboard.html"))
+        # index.html as well: Vercel (and any static host) serves the site root,
+        # and this branch is the deploy source. Same bytes, two names.
+        shutil.copy(dashboard_path, os.path.join(GITHUB_SYNC_WORKTREE, "index.html"))
         run = lambda *a: subprocess.run(  # noqa: E731
             ["git", *a], cwd=GITHUB_SYNC_WORKTREE, capture_output=True, text=True, timeout=30)
-        run("add", "dashboard.html")
+        run("add", "-A")
         status = run("status", "--porcelain")
         if not status.stdout.strip():
             return True  # no change since last sync
@@ -783,6 +786,9 @@ def main():
                 "rsi": ind["rsi"][last], "stoch": ind["stoch"][last],
                 "mfi": ind["mfi"][last], "adx": ind["adx"][last],
                 "atr": ind["atr"][last], "bar_ms": closed[last]["closeTime"],
+                # recent closes so the dashboard can draw a price chart without
+                # an external script (artifact pages block every remote host)
+                "hist": [round(c, 8) for c in ind["close"][-CHART_BARS:]],
                 "reads": {},
             }
             bench.observe(symbol, ind["close"][last], closed[last]["closeTime"])

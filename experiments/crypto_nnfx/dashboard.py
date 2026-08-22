@@ -21,6 +21,8 @@ SIGNIFICANCE_TARGET = 100  # trades per strategy before the comparison means muc
 
 CONTROLS = pt.CONTROL_BOOKS
 SHOWN = pt.REAL_BOOKS + pt.CONTROL_BOOKS[:1]   # one control column is enough
+SHORT = {**{k: f"Control {i + 1}" for i, k in enumerate(pt.CONTROL_BOOKS)},
+         "v1_rsi_macd": "V1 RSI+MACD", "v2_stoch_mfi": "V2 Stoch+MFI"}
 REAL = pt.REAL_BOOKS
 SERIES = {**{k: "s0" for k in CONTROLS}, "v1_rsi_macd": "s1", "v2_stoch_mfi": "s2"}
 LABEL = {**{k: f"Control {i + 1} · random entry" for i, k in enumerate(CONTROLS)},
@@ -65,6 +67,48 @@ def read_trades(path=pt.LOG_FILE):
     return rows
 
 
+def read_orders(path=pt.LOG_FILE, limit=40):
+    """Every ENTRY and EXIT, newest first. read_trades() keeps only closed
+    trades for the statistics; the order book wants both sides."""
+    if not os.path.exists(path):
+        return []
+    rows = []
+    with open(path, newline="") as f:
+        for r in csv.DictReader(f):
+            if r.get("event") not in ("ENTRY", "EXIT"):
+                continue
+            note = r.get("note", "")
+            pnl = None
+            if "pnl=" in note:
+                try:
+                    pnl = float(note.split("pnl=")[1].split()[0])
+                except (ValueError, IndexError):
+                    pnl = None
+            rows.append({"time": r["bar_time"], "strategy": r["strategy"],
+                         "symbol": r["symbol"], "event": r["event"],
+                         "side": r["side"], "price": float(r["price"]),
+                         "pnl": pnl,
+                         "reason": note.split(" pnl=")[0] if pnl is not None else ""})
+    rows.reverse()
+    return rows[:limit]
+
+
+def portfolio_totals(stats, orders_all):
+    """The two strategy books read as one account. The control books are
+    instruments, not the user's money, so they are excluded here."""
+    real = [stats[k] for k in REAL if k in stats]
+    return {
+        "net_worth": sum(r["equity"] for r in real),
+        "cash": sum(r["cash"] for r in real),
+        "unrealised": sum(r["unrealised"] for r in real),
+        "base": pt.INITIAL_CAPITAL * len(real),
+        "closed": sum(r["trades"] for r in real),
+        "open": sum(len(r["positions"]) for r in real),
+        "orders": sum(1 for o in orders_all if o["strategy"] in REAL),
+        "wins": sum(r["wins"] for r in real),
+    }
+
+
 def live_prices():
     """Last close per symbol, plus each strategy's current read. Best-effort."""
     out = {}
@@ -82,6 +126,7 @@ def live_prices():
                 "price": ind["close"][i], "ema": ind["ema"][100][i],
                 "rsi": ind["rsi"][i], "stoch": ind["stoch"][i], "mfi": ind["mfi"][i],
                 "adx": ind["adx"][i], "atr": ind["atr"][i], "reads": reads,
+                "hist": [round(c, 8) for c in ind["close"][-pt.CHART_BARS:]],
                 "bar_ms": bars[i]["closeTime"],
             }
         except Exception:  # noqa: BLE001 - dashboard renders fine without live data
@@ -146,6 +191,51 @@ def equity_curves(trades, state):
 
 
 # ------------------------------ svg ------------------------------
+
+def render_spark(hist, entry, sl, tp, side, width=280, height=76):
+    """Price line for one position with its entry, stop and target marked.
+
+    Drawn server-side as plain SVG rather than embedded from TradingView: the
+    artifact sandbox blocks every external host, so a widget would render an
+    empty box. The candles are the same Binance data the book trades on.
+    """
+    pts = [p for p in (hist or []) if p and p > 0]
+    # 96 points across 280px is finer than the pixels; every other one is
+    # visually identical and halves the page weight across ~40 cards
+    if len(pts) > 48:
+        pts = pts[::2]
+    if len(pts) < 3:
+        return '<div class="spark-empty">no price history yet</div>'
+    lo, hi = min(pts + [sl, tp]), max(pts + [sl, tp])
+    if hi <= lo:
+        return '<div class="spark-empty">flat</div>'
+    pad = 6
+    span = hi - lo
+
+    def y(v):
+        return pad + (height - 2 * pad) * (1 - (v - lo) / span)
+
+    def x(i):
+        return pad + (width - 2 * pad) * (i / (len(pts) - 1))
+
+    line = " ".join(f"{x(i):.0f},{y(v):.1f}" for i, v in enumerate(pts))
+    area = f"{pad},{height - pad} {line} {width - pad},{height - pad}"
+    won = (pts[-1] >= entry) if side == "long" else (pts[-1] <= entry)
+    col = "var(--pos)" if won else "var(--neg)"
+    rules = "".join(
+        f'<line x1="{pad}" y1="{y(v):.1f}" x2="{width - pad}" y2="{y(v):.1f}" '
+        f'class="rule {c}"/>'
+        for v, c in ((sl, "sl"), (tp, "tp"), (entry, "en")) if lo <= v <= hi)
+    return (
+        f'<svg viewBox="0 0 {width} {height}" preserveAspectRatio="none" '
+        f'class="spark" role="img" aria-label="Recent price with entry, stop and target">'
+        f'<polygon points="{area}" fill="{col}" fill-opacity="0.10"/>'
+        f'{rules}'
+        f'<polyline points="{line}" fill="none" stroke="{col}" stroke-width="1.6" '
+        f'stroke-linejoin="round"/>'
+        f'<circle cx="{x(len(pts) - 1):.1f}" cy="{y(pts[-1]):.1f}" r="2.6" fill="{col}"/>'
+        f'</svg>')
+
 
 def render_chart(curves, width=840, height=260):
     all_vals = [v for pts in curves.values() for _, v in pts]
@@ -271,6 +361,53 @@ h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:30px;font-weight:600;
 .meter-fill{background:var(--accent);height:100%}
 .meter-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 
+/* portfolio summary */
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);padding:22px 24px;display:flex;gap:28px;
+  align-items:flex-start;flex-wrap:wrap}
+.summary .big{display:flex;flex-direction:column;gap:3px;min-width:240px;flex:1 1 240px}
+.summary .big .v{font-size:38px;font-weight:600;letter-spacing:-.03em;line-height:1.1}
+.summary .sub{font-size:12.5px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+  gap:18px;flex:2 1 420px}
+.tile{display:flex;flex-direction:column;gap:2px}
+.tile .v{font-size:20px;font-weight:600;letter-spacing:-.02em}
+
+/* open position cards */
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
+.holding{border:1px solid var(--line);border-radius:10px;padding:13px 14px;
+  background:var(--surface-2);display:flex;flex-direction:column;gap:9px}
+.pos-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pos-top .sym{font-weight:600;font-size:15px;margin-right:7px}
+.pos-pnl{font-size:14px;font-weight:600;text-align:right}
+.pos-book{font-size:11px;color:var(--muted);margin-top:-6px}
+.spark{width:100%;height:76px;display:block}
+.spark-empty{height:76px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:6px}
+.rule{stroke-width:1;stroke-dasharray:3 3}
+.rule.sl{stroke:var(--neg)} .rule.tp{stroke:var(--pos)} .rule.en{stroke:var(--muted)}
+.pos-bar{height:4px;border-radius:100px;background:var(--neg);opacity:.25;overflow:hidden}
+.pos-bar-fill{height:100%;background:var(--pos);opacity:1}
+.pos-legs{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;
+  color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace}
+.pos-legs i.k{display:inline-block;width:7px;height:2px;margin-right:4px;
+  vertical-align:middle;border-radius:2px}
+.pos-legs i.sl{background:var(--neg)} .pos-legs i.tp{background:var(--pos)}
+.pos-legs i.en{background:var(--muted)}
+.pos-foot{display:flex;justify-content:space-between;align-items:center;
+  font-size:11.5px;padding-top:2px;border-top:1px solid var(--line)}
+.pos-foot a{color:var(--accent);text-decoration:none;font-weight:500}
+.pos-foot a:hover{text-decoration:underline}
+.ev{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;letter-spacing:.04em}
+.ev.entry{background:var(--surface-2);color:var(--accent);border:1px solid var(--line)}
+.ev.exit{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+
+#tv:empty{display:none}
+#bigchart{width:100%;height:320px;display:block}
+.chart-note{font-size:12px;color:var(--muted);margin-top:8px}
+#symsel{font:inherit;font-size:13px;padding:5px 9px;border-radius:7px;
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink)}
+
 /* cards */
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
@@ -343,8 +480,10 @@ def cls_for(v):
     return "pos" if v > 0 else ("neg" if v < 0 else "mut")
 
 
-def build_html(state, trades, live, generated, bench=None):
+def build_html(state, trades, live, generated, bench=None, orders=None):
     stats = strategy_stats(trades, state)
+    orders = orders or []
+    totals = portfolio_totals(stats, orders)
     curves = equity_curves(trades, state)
     total_trades = len(trades)
     # The evidence meter tracks the STRATEGIES only. Counting the five control
@@ -494,28 +633,81 @@ def build_html(state, trades, live, generated, bench=None):
           same start. Any book below this line lost money by being clever.</p>
       </div>""")
 
-    # --- open positions ---
-    open_rows = []
-    for strat, st in stats.items():
+    # --- open positions, as cards with a price chart each ---
+    # Strategy books only. The five control books hold their own positions, but
+    # they are instrumentation, not the user's portfolio — their count is noted
+    # beside the heading and their results live in the comparison below.
+    pos_cards = []
+    for strat, st in ((k, stats[k]) for k in REAL if k in stats):
         for sym, pos in sorted(st["positions"].items()):
-            price = live.get(sym, {}).get("price") or pos.get("last")
-            if price:
-                delta = ((price - pos["entry"]) if pos["side"] == "long"
-                         else (pos["entry"] - price)) * pos["qty"]
-                unreal = f'<span class="num {cls_for(delta)}">{delta:+,.2f}</span>'
-                now_px = f'<span class="num">{price:,.6g}</span>'
-            else:
-                unreal = now_px = '<span class="mut">&mdash;</span>'
-            open_rows.append(f"""
-        <tr><td>{html.escape(LABEL[strat])}</td>
-        <td class="num">{html.escape(sym.replace("USDT", ""))}</td>
-        <td><span class="tag {pos['side']}">{pos['side']}</span></td>
-        <td class="num">{pos['entry']:,.6g}</td><td>{now_px}</td>
-        <td class="num">{pos['sl']:,.6g}</td><td class="num">{pos['tp']:,.6g}</td>
-        <td>{unreal}</td></tr>""")
-    open_html = ("".join(open_rows) if open_rows else
-                 '<tr><td colspan="8" class="empty-row">No open positions &mdash; '
-                 'both accounts are flat.</td></tr>')
+            d = live.get(sym, {})
+            price = d.get("price") or pos.get("last") or pos["entry"]
+            delta = ((price - pos["entry"]) if pos["side"] == "long"
+                     else (pos["entry"] - price))
+            pnl = delta * pos["qty"]
+            pct = delta / pos["entry"] * 100 if pos["entry"] else 0.0
+            tv = html.escape(f"https://www.tradingview.com/chart/?symbol=BINANCE:{sym}")
+            # distance travelled from stop to target, as a progress bar
+            lo_, hi_ = (pos["sl"], pos["tp"]) if pos["side"] == "long" else (pos["tp"], pos["sl"])
+            frac = 0.0 if hi_ == lo_ else max(0.0, min(1.0, (price - lo_) / (hi_ - lo_)))
+            if pos["side"] == "short":
+                frac = 1 - frac
+            pos_cards.append(f"""
+      <div class="holding">
+        <div class="pos-top">
+          <div>
+            <span class="sym">{html.escape(sym.replace('USDT', ''))}</span>
+            <span class="tag {pos['side']}">{pos['side']}</span>
+          </div>
+          <span class="num {cls_for(pnl)} pos-pnl">{pnl:+,.2f}
+            <span class="mut" style="font-size:11px">{pct:+.2f}%</span></span>
+        </div>
+        <div class="pos-book">{html.escape(SHORT.get(strat, strat))}</div>
+        {render_spark(d.get("hist"), pos["entry"], pos["sl"], pos["tp"], pos["side"])}
+        <div class="pos-bar"><div class="pos-bar-fill" style="width:{frac * 100:.0f}%"></div></div>
+        <div class="pos-legs">
+          <span><i class="k sl"></i>Stop {pos['sl']:,.4f}</span>
+          <span><i class="k en"></i>Entry {pos['entry']:,.4f}</span>
+          <span><i class="k tp"></i>Target {pos['tp']:,.4f}</span>
+        </div>
+        <div class="pos-foot">
+          <span class="num">Now {price:,.4f}</span>
+          <a href="{tv}" target="_blank" rel="noopener">TradingView &#8599;</a>
+        </div>
+      </div>""")
+    if not pos_cards:
+        pos_cards = ['<div class="empty-row">Neither strategy is holding anything '
+                     'right now. Positions appear here the moment one enters.</div>']
+
+    # --- market chart: TradingView where the host allows it ---
+    # Artifact pages run under a CSP that blocks every external host, so the
+    # widget cannot load there. Rather than ship an empty box, the page draws
+    # the same Binance candles itself and only swaps in TradingView if the
+    # script actually arrives. Self-hosted copies get the real widget.
+    held = sorted({sym for k in REAL if k in stats for sym in stats[k]["positions"]})
+    if not held:
+        held = sorted(list(live)[:12])
+    chart_data = {sym: (live.get(sym, {}).get("hist") or []) for sym in held}
+    chart_json = json.dumps({k: v for k, v in chart_data.items() if v})
+    chart_opts = "".join(
+        f'<option value="{html.escape(s_)}">{html.escape(s_.replace("USDT", ""))}</option>'
+        for s_ in held)
+
+    # --- order book: entries and exits, newest first ---
+    order_rows = "".join(f"""
+        <tr><td class="num mut">{html.escape(o['time'][:16].replace('T', ' '))}</td>
+        <td><span class="ev {o['event'].lower()}">{o['event']}</span></td>
+        <td class="num">{html.escape(o['symbol'].replace('USDT', ''))}</td>
+        <td><span class="tag {o['side']}">{o['side']}</span></td>
+        <td class="num">{o['price']:,.4f}</td>
+        <td class="mut">{html.escape(SHORT.get(o['strategy'], o['strategy']))}</td>
+        <td class="mut">{html.escape(o['reason'] or '—')}</td>
+        <td class="num {cls_for(o['pnl']) if o['pnl'] is not None else 'mut'}">{
+            f"{o['pnl']:+,.2f}" if o['pnl'] is not None else '—'}</td></tr>"""
+        for o in orders)
+    if not order_rows:
+        order_rows = ('<tr><td colspan="8" class="empty-row">No orders yet.</td></tr>')
+
 
     # --- live signals ---
     sig_rows = []
@@ -538,21 +730,6 @@ def build_html(state, trades, live, generated, bench=None):
         sig_rows = ['<tr><td colspan="9" class="empty-row">Waiting for the '
                     'first price fetch.</td></tr>']
 
-    # --- recent trades ---
-    recent = sorted(trades, key=lambda t: t["time"], reverse=True)[:20]
-    trade_rows = "".join(f"""
-        <tr><td class="num mut">{html.escape(t['time'][:16].replace('T', ' '))}</td>
-        <td>{html.escape(LABEL[t['strategy']])}</td>
-        <td class="num">{html.escape(t['symbol'].replace('USDT', ''))}</td>
-        <td><span class="tag {t['side']}">{t['side']}</span></td>
-        <td class="num">{t['price']:,.4f}</td>
-        <td class="mut">{html.escape(t['reason'])}</td>
-        <td class="num {cls_for(t['pnl'])}">{t['pnl']:+,.2f}</td></tr>"""
-        for t in recent)
-    if not trade_rows:
-        trade_rows = ('<tr><td colspan="7" class="empty-row">No closed trades yet. '
-                      'Each book trades only when all of its conditions line up on a '
-                      'closed hourly candle.</td></tr>')
 
     legend = "".join(
         f'<span><span class="swatch" style="background:var(--{SERIES[s]})"></span>'
@@ -579,6 +756,63 @@ def build_html(state, trades, live, generated, bench=None):
     </div>
   </header>
 
+  <div class="summary">
+    <div class="big">
+      <span class="lbl">Portfolio net worth</span>
+      <span class="v num">{fmt_money(totals['net_worth'])}</span>
+      <span class="num {cls_for(totals['net_worth'] - totals['base'])} sub">
+        {fmt_money(totals['net_worth'] - totals['base'])} ({fmt_pct((totals['net_worth'] / totals['base'] - 1) * 100)})
+        since {fmt_money(totals['base'])} start</span>
+    </div>
+    <div class="tiles">
+      <div class="tile"><span class="lbl">Cash</span>
+        <span class="v num">{fmt_money(totals['cash'])}</span>
+        <span class="sub mut">settled, not in a trade</span></div>
+      <div class="tile"><span class="lbl">In open trades</span>
+        <span class="v num {cls_for(totals['unrealised'])}">{fmt_money(totals['unrealised'])}</span>
+        <span class="sub mut">{totals['open']} position{'' if totals['open'] == 1 else 's'} live</span></div>
+      <div class="tile"><span class="lbl">Orders placed</span>
+        <span class="v num">{totals['orders']}</span>
+        <span class="sub mut">{totals['closed']} round trips closed</span></div>
+      <div class="tile"><span class="lbl">Win rate</span>
+        <span class="v num">{(totals['wins'] / totals['closed'] * 100) if totals['closed'] else 0:.0f}%</span>
+        <span class="sub mut">{totals['wins']}W / {totals['closed'] - totals['wins']}L</span></div>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head"><h2>Open positions</h2>
+      <span class="lbl">{totals['open']} held by the strategies &middot;
+        {sum(len(stats[k]['positions']) for k in CONTROLS if k in stats)} more in the control books</span></div>
+    <div class="sec-body"><div class="pos-grid">{"".join(pos_cards)}</div></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Market chart</h2>
+      <select id="symsel" aria-label="Choose a market">{chart_opts}</select></div>
+    <div class="sec-body">
+      <div id="tv"></div>
+      <div id="fallback"><svg id="bigchart" viewBox="0 0 900 320"
+        preserveAspectRatio="none" role="img" aria-label="Price history"></svg>
+        <p class="chart-note" id="cnote">Drawn from the same Binance hourly candles
+          the books trade on.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Recent orders</h2>
+      <span class="lbl">newest first</span></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Time</th><th>Event</th><th>Market</th><th>Side</th>
+        <th>Price</th><th>Book</th><th>Reason</th><th>P&amp;L</th></tr></thead>
+      <tbody>{order_rows}</tbody></table></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Equity curve</h2><div class="legend">{legend}</div></div>
+    <div class="sec-body"><div class="chart">{render_chart(curves)}</div></div>
+  </section>
+
   <div class="verdict">
     <div class="verdict-head"><h2>{html.escape(headline)}</h2></div>
     <p>{html.escape(body)}</p>
@@ -598,19 +832,6 @@ def build_html(state, trades, live, generated, bench=None):
   <div class="grid2">{"".join(cards)}</div>
 
   <section>
-    <div class="sec-head"><h2>Equity curve</h2><div class="legend">{legend}</div></div>
-    <div class="sec-body"><div class="chart">{render_chart(curves)}</div></div>
-  </section>
-
-  <section>
-    <div class="sec-head"><h2>Open positions</h2></div>
-    <div class="scroll"><table>
-      <thead><tr><th>Strategy</th><th>Market</th><th>Side</th><th>Entry</th>
-        <th>Now</th><th>Stop</th><th>Target</th><th>Unrealized</th></tr></thead>
-      <tbody>{open_html}</tbody></table></div>
-  </section>
-
-  <section>
     <div class="sec-head"><h2>What each strategy sees right now</h2></div>
     <div class="scroll"><table>
       <thead><tr><th>Market</th><th>Price</th><th>Trend</th><th>RSI</th><th>Stoch</th>
@@ -620,20 +841,70 @@ def build_html(state, trades, live, generated, bench=None):
       <tbody>{"".join(sig_rows)}</tbody></table></div>
   </section>
 
-  <section>
-    <div class="sec-head"><h2>Closed trades</h2>
-      <span class="lbl">{total_trades} total</span></div>
-    <div class="scroll"><table>
-      <thead><tr><th>Closed</th><th>Strategy</th><th>Market</th><th>Side</th>
-        <th>Exit</th><th>Reason</th><th>P&amp;L</th></tr></thead>
-      <tbody>{trade_rows}</tbody></table></div>
-  </section>
+  <script>
+  const HIST = {chart_json};
+  const sel = document.getElementById('symsel');
+  const svg = document.getElementById('bigchart');
+
+  function draw(sym) {{
+    const pts = HIST[sym] || [];
+    svg.innerHTML = '';
+    if (pts.length < 3) return;
+    const W = 900, H = 320, pad = 14;
+    const lo = Math.min(...pts), hi = Math.max(...pts), span = (hi - lo) || 1;
+    const x = i => pad + (W - 2 * pad) * (i / (pts.length - 1));
+    const y = v => pad + (H - 2 * pad) * (1 - (v - lo) / span);
+    const line = pts.map((v, i) => x(i).toFixed(0) + ',' + y(v).toFixed(1)).join(' ');
+    const up = pts[pts.length - 1] >= pts[0];
+    const col = up ? 'var(--pos)' : 'var(--neg)';
+    const ns = 'http://www.w3.org/2000/svg';
+    const poly = document.createElementNS(ns, 'polygon');
+    poly.setAttribute('points', pad + ',' + (H - pad) + ' ' + line + ' ' + (W - pad) + ',' + (H - pad));
+    poly.setAttribute('fill', col); poly.setAttribute('fill-opacity', '0.10');
+    svg.appendChild(poly);
+    const pl = document.createElementNS(ns, 'polyline');
+    pl.setAttribute('points', line); pl.setAttribute('fill', 'none');
+    pl.setAttribute('stroke', col); pl.setAttribute('stroke-width', '2');
+    pl.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(pl);
+  }}
+
+  // Try the real widget. If the host blocks external scripts (every artifact
+  // page does) the error handler fires and the native chart simply stays.
+  let tvReady = false;
+  function mountTV(sym) {{
+    if (!tvReady) return;
+    document.getElementById('tv').innerHTML = '';
+    try {{
+      new TradingView.widget({{
+        container_id: 'tv', symbol: 'BINANCE:' + sym, interval: '60',
+        autosize: false, width: '100%', height: 380, theme:
+          (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+        style: '1', locale: 'en', hide_side_toolbar: true, allow_symbol_change: false,
+      }});
+      document.getElementById('fallback').style.display = 'none';
+    }} catch (e) {{ tvReady = false; }}
+  }}
+
+  const tag = document.createElement('script');
+  tag.src = 'https://s3.tradingview.com/tv.js';
+  tag.onload = () => {{ tvReady = true; mountTV(sel.value); }};
+  tag.onerror = () => {{
+    document.getElementById('cnote').textContent =
+      'TradingView is blocked on this host, so the chart is drawn here from the '
+      + 'same Binance hourly candles the books trade on.';
+  }};
+  document.head.appendChild(tag);
+
+  sel.addEventListener('change', () => {{ draw(sel.value); mountTV(sel.value); }});
+  draw(sel.value);
+  </script>
 
   <footer>Simulated trading only &mdash; no orders are placed and no real money is
     at risk. Each strategy runs one {fmt_money(pt.INITIAL_CAPITAL)} account across
-    {len(pt.SYMBOLS)} markets on {pt.INTERVAL} candles, sizing every position at
-    1/{pt.MAX_CONCURRENT} of equity with a {pt.ATR_MULT_SL}&times; ATR stop and
-    {pt.RR}R target. The book halts for {pt.HALT_COOLDOWN_HOURS}h after
+    {len(pt.SYMBOLS)} markets on {pt.INTERVAL} candles, risking {pt.RISK_PCT}% of equity per
+    position (capped at 1/{pt.MAX_CONCURRENT} notional, max {pt.MAX_PER_SIDE} per
+    side) behind a {pt.ATR_MULT_SL}&times; ATR stop with a {pt.RR}R target. The book halts for {pt.HALT_COOLDOWN_HOURS}h after
     {pt.MAX_CONSEC_LOSS} consecutive losses or a {pt.MAX_DD_PCT:.0f}% drawdown.</footer>
 </div>
 """
@@ -654,7 +925,8 @@ def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None):
         bench = b.equity()
     if live is None:
         live = live_prices() if fetch_live else {}
-    page = build_html(state, trades, live, datetime.now(timezone.utc), bench=bench)
+    page = build_html(state, trades, live, datetime.now(timezone.utc), bench=bench,
+                      orders=read_orders())
     with open(out_file, "w") as f:
         f.write(page)
     return out_file, len(trades), len(state)
