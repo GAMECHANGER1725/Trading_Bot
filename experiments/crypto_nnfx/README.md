@@ -6,45 +6,102 @@ belong to the main system and has not earned a D-number.
 
 ## What it is
 
-A forward-testing harness for two hand-written rule strategies on Binance
-hourly crypto candles, using public market data only (no account, no keys).
+A forward-testing harness for rule strategies on Binance hourly crypto candles,
+using public market data only (no account, no keys). **Three** books now share
+one risk model, one $10k account each, across 32 markets:
 
 | book | entry rule |
 |---|---|
+| `v0_control` | **coin flip**, same regime gate, same everything else |
 | `v1_rsi_macd` | EMA100 baseline + RSI + MACD confluence, ADX>20 |
 | `v2_stoch_mfi` | EMA100 baseline + Stochastic + MFI confluence, ADX>15 |
 
-Both share one risk model: 2.5x ATR stop, 2.5R target, halt after 4
-consecutive losses or 15% drawdown, 24-bar cooldown. Six books
-(2 strategies x BTC/ETH/SOL), $10k virtual each.
+Risk model: 2.5x ATR stop, 2.5R target, risk-based sizing capped at 1/20 of
+equity, max 8 positions per side, size halves after 3 consecutive losses, hard
+halt after 6 or at 15% drawdown, 24h cooldown. Commission 0.05% and slippage
+0.02% per side.
 
     python3 paper_trader.py            # run (writes dashboard.html each poll)
-    python3 paper_trader.py --report   # standings
-    python3 paper_trader.py --selftest # ~45 assertions
+    python3 paper_trader.py --report   # standings, expectancy, t
+    python3 paper_trader.py --selftest # ~80 assertions
+    python3 replay.py --split          # replay all books over recent history
     python3 dashboard.py               # render dashboard only
+
+## The control book is the point
+
+A 2.5R target behind an ATR stop wins **~28% of the time on chance alone**. The
+measured win rate was 30.4%. So "Bob wins 30% of his trades" was never evidence
+of anything, and for the first day of running there was nothing in the system
+capable of noticing that.
+
+`v0_control` enters at random on the same markets, through the same regime
+filter, with the same stops, targets and sizing. The only difference is whether
+the entry carries information. `STATUS.md` has required this test since the
+XGBoost work ("shuffle-control every new feature block; if permuted values score
+the same, the block is noise") — it had simply never been applied here.
+
+Everything is also carried against **equal-weight buy-and-hold of the same 32
+markets**, because a return means nothing without knowing what the market did.
+
+## Findings, 22 Aug 2026
+
+Replay over 15 days of 1h candles, 32 markets, current rules:
+
+| book | return | W/L | win% | per trade | t |
+|---|---|---|---|---|---|
+| `v0_control` | +1.35% | 76/165 | 31.5% | +0.56 | 0.92 |
+| `v1_rsi_macd` | −0.02% | 35/122 | 22.3% | −0.01 | −0.01 |
+| `v2_stoch_mfi` | +0.41% | 47/127 | 27.0% | +0.23 | 0.25 |
+| **buy & hold** | **+30.79%** | | | | |
+
+Two things fall out, and neither is flattering:
+
+1. **Neither strategy beats random entry.** Welch t on the difference in mean
+   P&L is −0.50 and −0.30. Split into halves the picture is the same in both
+   (t = −0.04 / +0.07 for v1), and the control's win rate rises and falls *with*
+   the strategies' — 22% in the first half, 35% in the second, for all three
+   books at once. That is a regime moving together, not skill.
+2. **Trading badly underperformed holding.** +0.4% against +30.8% over the same
+   window on the same markets.
+
+### The sizing bug that was manufacturing an edge
+
+Before 22 Aug every position took a fixed 1/20 notional slice. With the stop at
+2.5xATR and ATR varying several-fold across these markets, that meant **every
+trade risked a different amount** — the volatile coins were quietly betting
+several times what the calm ones did. This is not the NNFX model the code claims
+to implement, and it makes "2.5R" mean something different on every trade.
+
+Switching to risk-based sizing (capped at the old notional, so total exposure is
+unchanged) moved v1 from **+3.47% to −0.02%** and cut the standard error on mean
+P&L from 2.47 to 0.99. The apparent edge was concentrated in a handful of
+oversized positions in high-volatility markets. It was a volatility bet wearing a
+signal's clothes.
+
+The fix was adopted because it is the correct implementation of the stated risk
+model, not because of what it did to the number. It happened to make the results
+worse, which is the direction that should raise the least suspicion.
 
 ## How it conflicts with the repo's settled positions
 
-Read this before taking any number it produces seriously.
+- **Parameters were fitted by grid search** (36 then 32 combinations). 
+  `PLAN_BEAT_SPY.md` names the only live direction as a sleeve with *zero fitted
+  parameters*. This is the opposite.
+- **Search-until-it-passes.** Two indicator sets were tried and the better one
+  kept — exactly the pattern DECISIONS warns gives a ~100% chance of a fake win.
+- **v1's original out-of-sample test was contaminated** (fitted 2024-2026,
+  "validated" on 2025-2026, a subset).
+- **The one honest number never cleared the bar.** v2's clean out-of-sample run
+  was t = 0.74 against a standing bar of |t| > 2.
 
-- **Parameters were fitted by grid search** (36 then 32 combinations on
-  trader.dev). `PLAN_BEAT_SPY.md` names the only live direction as a sleeve
-  with *zero fitted parameters*. This is the opposite.
-- **Search-until-it-passes.** DECISIONS warns that 20 worthless variants give
-  a ~100% chance of a fake win. Two indicator sets were tried and the second
-  was kept because it scored better — exactly that pattern.
-- **v1's out-of-sample test was contaminated.** Parameters were fitted over
-  2024-2026 and "validated" on 2025-2026, a subset of the fitting window.
-  v2's split (fit 2024, test 2025-2026) was clean. The two are therefore not
-  comparable, and the repo rule "no strategy comparison without its error bar"
-  was not met.
-- **The one honest number is not significant.** v2's clean out-of-sample run
-  was +8.8% over 23 trades, mean trade +$38.22, SE $51.55, **t = 0.74**.
-  The repo's own bar is |t| > 2. This does not clear it.
+`replay.py` exists so that no future change to this system gets adopted on the
+strength of a return alone. It reports the control comparison and the
+buy-and-hold comparison every time, and it must not be used to pick parameters.
 
 ## Status
 
-Unproven. The forward test is the only part with evidence value, and it needs
-~100 closed trades per strategy before the standings mean anything. Nothing
-here should be read as an edge, and none of it bears on the S&P 500 system in
-`src/`.
+**Unproven, and now with evidence pointing at "no edge" rather than silence.**
+The forward test restarted from zero on 22 Aug when slippage, risk sizing and
+the side cap changed the rules — the earlier 55 trades are archived under
+`archive/` and are not comparable. Nothing here should be read as an edge, and
+none of it bears on the S&P 500 system in `src/`.

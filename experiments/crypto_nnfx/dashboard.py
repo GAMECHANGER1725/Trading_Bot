@@ -19,8 +19,12 @@ import paper_trader as pt
 OUT_FILE = "dashboard.html"
 SIGNIFICANCE_TARGET = 100  # trades per strategy before the comparison means much
 
-SERIES = {"v1_rsi_macd": "s1", "v2_stoch_mfi": "s2"}
-LABEL = {"v1_rsi_macd": "V1 · RSI + MACD", "v2_stoch_mfi": "V2 · Stochastic + MFI"}
+SERIES = {"v0_control": "s0", "v1_rsi_macd": "s1", "v2_stoch_mfi": "s2"}
+LABEL = {"v0_control": "Control · random entry",
+         "v1_rsi_macd": "V1 · RSI + MACD",
+         "v2_stoch_mfi": "V2 · Stochastic + MFI"}
+CONTROL = "v0_control"
+REAL = [k for k in SERIES if k != CONTROL]
 
 
 # ------------------------------ data ------------------------------
@@ -30,7 +34,7 @@ def read_state(path=pt.STATE_FILE):
         return {}
     try:
         with open(path) as f:
-            return json.load(f).get("books", {})
+            return json.load(f).get("portfolios", {})
     except (json.JSONDecodeError, OSError):
         return {}
 
@@ -88,50 +92,45 @@ def strategy_stats(trades, state):
     """Aggregate per strategy: equity, returns, win/loss, profit factor, t-stat."""
     stats = {}
     for strat in pt.STRATEGIES:
-        books = {n: s for n, s in state.items() if n.startswith(strat + "/")}
+        acct = state.get(strat, {})
         ts = [t for t in trades if t["strategy"] == strat]
         pnls = [t["pnl"] for t in ts]
         wins = [p for p in pnls if p > 0]
         losses = [p for p in pnls if p <= 0]
         gross_win, gross_loss = sum(wins), abs(sum(losses))
-        equity = sum(b["cash_equity"] for b in books.values()) if books else 0.0
-        base = pt.INITIAL_CAPITAL * max(len(books), 1)
+        equity = acct.get("cash_equity", pt.INITIAL_CAPITAL)
         mean = sum(pnls) / len(pnls) if pnls else 0.0
         # Sample t-stat on mean trade P&L — the honest read on whether any
         # apparent edge is distinguishable from noise at this sample size.
-        t_stat = None
+        t_stat, se = None, 0.0
         if len(pnls) > 2:
             var = sum((p - mean) ** 2 for p in pnls) / (len(pnls) - 1)
             se = math.sqrt(var / len(pnls)) if var > 0 else 0.0
             t_stat = mean / se if se > 0 else None
         stats[strat] = {
-            "equity": equity, "base": base,
-            "return_pct": (equity / base - 1) * 100 if base else 0.0,
+            "equity": equity, "base": pt.INITIAL_CAPITAL,
+            "return_pct": (equity / pt.INITIAL_CAPITAL - 1) * 100,
             "trades": len(ts), "wins": len(wins), "losses": len(losses),
             "win_rate": len(wins) / len(ts) * 100 if ts else 0.0,
             "profit_factor": (gross_win / gross_loss) if gross_loss else
                              (float("inf") if gross_win else 0.0),
-            "avg_trade": mean, "t_stat": t_stat,
-            "books": books,
+            "avg_trade": mean, "t_stat": t_stat, "se": se,
+            "positions": acct.get("positions", {}),
+            "halted": acct.get("halted_until_ms", 0) > __import__("time").time() * 1000,
         }
     return stats
 
 
 def equity_curves(trades, state):
-    """Aggregate equity over time per strategy, rebuilt from the trade log."""
+    """Equity over time per strategy, rebuilt from the trade log."""
     curves = {}
     for strat in pt.STRATEGIES:
-        book_names = [n for n in state if n.startswith(strat + "/")]
-        if not book_names:
-            book_names = [f"{strat}/{s}" for s in pt.SYMBOLS]
-        running = {n: pt.INITIAL_CAPITAL for n in book_names}
-        pts = [(None, sum(running.values()))]
+        running = pt.INITIAL_CAPITAL
+        pts = [(None, running)]
         for t in sorted((x for x in trades if x["strategy"] == strat),
                         key=lambda x: x["time"]):
-            key = f"{t['strategy']}/{t['symbol']}"
-            if key in running:
-                running[key] += t["pnl"]
-            pts.append((t["time"], sum(running.values())))
+            running += t["pnl"]
+            pts.append((t["time"], running))
         curves[strat] = pts
     return curves
 
@@ -171,7 +170,7 @@ def render_chart(curves, width=840, height=260):
         gy = pad + (height - 2 * pad) * frac
         parts.append(f'<line x1="{pad}" y1="{gy:.1f}" x2="{width - pad}" y2="{gy:.1f}" '
                      f'class="grid"/>')
-    base_total = pt.INITIAL_CAPITAL * len(pt.SYMBOLS)
+    base_total = pt.INITIAL_CAPITAL
     if lo < base_total < hi:
         by = y(base_total)
         parts.append(f'<line x1="{pad}" y1="{by:.1f}" x2="{width - pad}" y2="{by:.1f}" '
@@ -202,7 +201,7 @@ CSS = """
 :root{
   --bg:#EDF0F2; --surface:#FFFFFF; --surface-2:#F6F8F9;
   --ink:#10161C; --muted:#5C6B78; --line:#D4DBE0;
-  --accent:#2E5EAA; --s1:#B4531F; --s2:#0F7A6C;
+  --accent:#2E5EAA; --s0:#8A8F98; --s1:#B4531F; --s2:#0F7A6C;
   --pos:#1B7A3E; --neg:#B3261E; --warn:#8A6410;
   --pos-bg:#E6F2EA; --neg-bg:#FBE9E7; --warn-bg:#FBF2DF;
   --shadow:0 1px 2px rgba(16,22,28,.06),0 8px 24px rgba(16,22,28,.05);
@@ -211,7 +210,7 @@ CSS = """
   :root:not([data-theme="light"]){
     --bg:#0D1418; --surface:#131C22; --surface-2:#18242B;
     --ink:#E4EBEF; --muted:#8798A5; --line:#233039;
-    --accent:#6E9BE8; --s1:#E08040; --s2:#35B8A5;
+    --accent:#6E9BE8; --s0:#7E838C; --s1:#E08040; --s2:#35B8A5;
     --pos:#3DBE6E; --neg:#E4574C; --warn:#D6A93C;
     --pos-bg:#12271B; --neg-bg:#2A1614; --warn-bg:#251E0E;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
@@ -220,7 +219,7 @@ CSS = """
 :root[data-theme="dark"]{
   --bg:#0D1418; --surface:#131C22; --surface-2:#18242B;
   --ink:#E4EBEF; --muted:#8798A5; --line:#233039;
-  --accent:#6E9BE8; --s1:#E08040; --s2:#35B8A5;
+  --accent:#6E9BE8; --s0:#7E838C; --s1:#E08040; --s2:#35B8A5;
   --pos:#3DBE6E; --neg:#E4574C; --warn:#D6A93C;
   --pos-bg:#12271B; --neg-bg:#2A1614; --warn-bg:#251E0E;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
@@ -266,6 +265,9 @@ h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:30px;font-weight:600;
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
   padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+.card.s0{border-top:3px solid var(--s0)}
+.card.bench{border-top:3px solid var(--muted);border-style:dashed solid solid solid}
+.card-note{margin-top:10px;font-size:12px;line-height:1.5;color:var(--muted)}
 .card.s1{border-top:3px solid var(--s1)}
 .card.s2{border-top:3px solid var(--s2)}
 .card h3{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
@@ -331,42 +333,79 @@ def cls_for(v):
     return "pos" if v > 0 else ("neg" if v < 0 else "mut")
 
 
-def build_html(state, trades, live, generated):
+def build_html(state, trades, live, generated, bench=None):
     stats = strategy_stats(trades, state)
     curves = equity_curves(trades, state)
     total_trades = len(trades)
 
     # --- staleness: has the feed advanced recently? ---
-    newest = max((b.get("last_close_ms", 0) for b in state.values()), default=0)
+    # last_close_ms is a {symbol: ms} map per account — flatten before comparing
+    newest = max((ms for acct in state.values()
+                  for ms in acct.get("last_close_ms", {}).values()), default=0)
     age_h = (generated.timestamp() * 1000 - newest) / 3_600_000 if newest else 999
     live_ok = age_h < 2.5
     pill = ('<span class="pill live"><span class="dot"></span>Running</span>' if live_ok
             else '<span class="pill stale"><span class="dot"></span>No new candles</span>')
 
     # --- verdict copy ---
-    ranked = sorted(stats.items(), key=lambda kv: kv[1]["return_pct"], reverse=True)
-    lead, trail = ranked[0], ranked[1]
+    # The question this dashboard answers is NOT "which strategy is ahead".
+    # Two books entering on indicators are compared against a third entering at
+    # random with an identical risk model, and against simply holding the same
+    # 32 markets. A strategy that beats neither has demonstrated nothing,
+    # whatever its return says.
+    ranked = sorted(((k, v) for k, v in stats.items() if k in REAL),
+                    key=lambda kv: kv[1]["avg_trade"], reverse=True)
+    lead = ranked[0]
+    ctrl = stats.get(CONTROL)
+    bench_ret = (bench / pt.INITIAL_CAPITAL - 1) * 100 if bench else None
+
+    def welch(a, b):
+        """t on the difference of two mean-P&L figures. Two independent books,
+        unequal variance and unequal n, so Welch rather than a pooled test."""
+        if not a or not b or a["trades"] < 2 or b["trades"] < 2:
+            return None
+        sa, sb = a.get("se"), b.get("se")
+        if not sa or not sb:
+            return None
+        return (a["avg_trade"] - b["avg_trade"]) / math.sqrt(sa ** 2 + sb ** 2)
+
+    vs_ctrl = welch(lead[1], ctrl)
+    min_real = min(s_["trades"] for k, s_ in ranked)
+    ctrl_n = ctrl["trades"] if ctrl else 0
+
     if total_trades == 0:
         headline = "Waiting for the first trade"
-        body = ("Both strategies are loaded and watching three markets. Neither has "
-                "opened a position yet — entries only fire when the baseline, both "
-                "confluence indicators, and the trend filter agree on a closed candle.")
-    elif lead[1]["trades"] < 10:
-        headline = f"{LABEL[lead[0]]} ahead, far too early to matter"
-        body = (f"{lead[1]['trades']} trades in. At this sample size the standings are "
-                "essentially noise — a single trade can flip the order. The number to "
-                "watch is the trade count, not the returns.")
+        body = ("Three books are loaded across 32 markets: two entering on "
+                "indicator confluence, one entering at random as a control. "
+                "Entries fire only on a closed candle.")
+    elif min_real < 10 or ctrl_n < 10:
+        headline = "Too early to read"
+        body = (f"{total_trades} trades across all three books. At this sample the "
+                "standings are noise — a single trade reorders them. The number "
+                "worth watching is the trade count, not the returns.")
+    elif vs_ctrl is None:
+        headline = f"{LABEL[lead[0]]} leads on expectancy"
+        body = ("Not yet enough closed trades in the control book to say whether "
+                "that lead means anything.")
     else:
-        t = lead[1]["t_stat"]
-        sig = (abs(t) > 2) if t is not None else False
-        headline = f"{LABEL[lead[0]]} leads by {lead[1]['return_pct'] - trail[1]['return_pct']:.2f} points"
+        beats_ctrl = vs_ctrl > 2
+        headline = (f"{LABEL[lead[0]]} beats random entry"
+                    if beats_ctrl else "No book has beaten random entry")
         body = (
-            f"Lead strategy's average trade is {fmt_money(lead[1]['avg_trade'])} "
-            f"with a t-statistic of {t:.2f}. " if t is not None else "")
-        body += ("That clears the ~2.0 threshold, so the edge is unlikely to be luck."
-                 if sig else
-                 "Anything under ~2.0 is indistinguishable from luck, so treat this "
-                 "as provisional no matter how the returns look.")
+            f"Best book averages {fmt_money(lead[1]['avg_trade'])} per trade against "
+            f"{fmt_money(ctrl['avg_trade'])} for coin-flip entries on the same "
+            f"markets and the same risk model — a difference of t = {vs_ctrl:.2f}. ")
+        body += ("That clears the |t| > 2 bar, so the entry signal is doing "
+                 "measurable work."
+                 if beats_ctrl else
+                 "Below the |t| > 2 bar, so on the evidence so far the indicators "
+                 "are not distinguishable from noise and the results are the risk "
+                 "model, not the signal.")
+        if bench_ret is not None:
+            best_ret = max(s_["return_pct"] for _, s_ in ranked)
+            body += (f" Buy-and-hold on the same basket returned {fmt_pct(bench_ret)} "
+                     f"over the same window, against {fmt_pct(best_ret)} for the "
+                     f"best book.")
 
     pct_done = min(total_trades / (SIGNIFICANCE_TARGET * 2) * 100, 100)
 
@@ -396,58 +435,77 @@ def build_html(state, trades, live, generated):
         </div>
       </div>""")
 
+    if bench:
+        b_ret = (bench / pt.INITIAL_CAPITAL - 1) * 100
+        best = max((s_["return_pct"] for k, s_ in stats.items() if k in REAL),
+                   default=0.0)
+        cards.append(f"""
+      <div class="card bench">
+        <h3><span class="swatch" style="background:var(--muted)"></span>Buy &amp; hold</h3>
+        <div class="figures">
+          <div class="fig"><span class="lbl">Equity</span>
+            <span class="v num">{fmt_money(bench)}</span></div>
+          <div class="fig"><span class="lbl">Return</span>
+            <span class="v num {cls_for(b_ret)}">{fmt_pct(b_ret)}</span></div>
+          <div class="fig"><span class="lbl">Best book vs hold</span>
+            <span class="v num sm {cls_for(best - b_ret)}">{fmt_pct(best - b_ret)}</span></div>
+          <div class="fig"><span class="lbl">Basket</span>
+            <span class="v num sm mut">{len(pt.SYMBOLS)} equal</span></div>
+        </div>
+        <p class="card-note">Doing nothing but holding the same markets, from the
+          same start. Any book below this line lost money by being clever.</p>
+      </div>""")
+
     # --- open positions ---
     open_rows = []
-    for name in sorted(state):
-        b = state[name]
-        p = b.get("position")
-        if not p:
-            continue
-        strat, sym = name.split("/")
-        price = live.get(sym, {}).get("price")
-        if price:
-            delta = ((price - p["entry"]) if p["side"] == "long"
-                     else (p["entry"] - price)) * p["qty"]
-            unreal = f'<span class="num {cls_for(delta)}">{delta:+,.2f}</span>'
-            now_px = f'<span class="num">{price:,.4f}</span>'
-        else:
-            unreal, now_px = '<span class="mut">—</span>', '<span class="mut">—</span>'
-        open_rows.append(f"""
-        <tr><td>{html.escape(LABEL[strat])}</td><td class="num">{html.escape(sym)}</td>
-        <td><span class="tag {p['side']}">{p['side']}</span></td>
-        <td class="num">{p['entry']:,.4f}</td><td>{now_px}</td>
-        <td class="num">{p['sl']:,.4f}</td><td class="num">{p['tp']:,.4f}</td>
+    for strat, st in stats.items():
+        for sym, pos in sorted(st["positions"].items()):
+            price = live.get(sym, {}).get("price") or pos.get("last")
+            if price:
+                delta = ((price - pos["entry"]) if pos["side"] == "long"
+                         else (pos["entry"] - price)) * pos["qty"]
+                unreal = f'<span class="num {cls_for(delta)}">{delta:+,.2f}</span>'
+                now_px = f'<span class="num">{price:,.6g}</span>'
+            else:
+                unreal = now_px = '<span class="mut">&mdash;</span>'
+            open_rows.append(f"""
+        <tr><td>{html.escape(LABEL[strat])}</td>
+        <td class="num">{html.escape(sym.replace("USDT", ""))}</td>
+        <td><span class="tag {pos['side']}">{pos['side']}</span></td>
+        <td class="num">{pos['entry']:,.6g}</td><td>{now_px}</td>
+        <td class="num">{pos['sl']:,.6g}</td><td class="num">{pos['tp']:,.6g}</td>
         <td>{unreal}</td></tr>""")
     open_html = ("".join(open_rows) if open_rows else
-                 '<tr><td colspan="8" class="empty-row">No open positions — '
-                 'every book is flat.</td></tr>')
+                 '<tr><td colspan="8" class="empty-row">No open positions &mdash; '
+                 'both accounts are flat.</td></tr>')
 
     # --- live signals ---
     sig_rows = []
     for sym in pt.SYMBOLS:
         d = live.get(sym)
         if not d:
-            sig_rows.append(f'<tr><td class="num">{html.escape(sym)}</td>'
-                            f'<td colspan="7" class="mut">price feed unavailable</td></tr>')
             continue
         bias = "above" if d["price"] > d["ema"] else "below"
         reads = "".join(
-            f'<td><span class="tag {d["reads"][s]}">{d["reads"][s]}</span></td>'
-            for s in pt.STRATEGIES)
+            f'<td><span class="tag {d["reads"][s2]}">{d["reads"][s2]}</span></td>'
+            for s2 in pt.STRATEGIES)
         sig_rows.append(f"""
-        <tr><td class="num">{html.escape(sym)}</td>
-        <td class="num">{d['price']:,.2f}</td>
+        <tr><td class="num">{html.escape(sym.replace("USDT", ""))}</td>
+        <td class="num">{d['price']:,.6g}</td>
         <td class="mut">{bias} EMA100</td>
         <td class="num">{d['rsi']:.0f}</td><td class="num">{d['stoch']:.0f}</td>
         <td class="num">{d['mfi']:.0f}</td><td class="num">{d['adx']:.0f}</td>
         {reads}</tr>""")
+    if not sig_rows:
+        sig_rows = ['<tr><td colspan="9" class="empty-row">Waiting for the '
+                    'first price fetch.</td></tr>']
 
     # --- recent trades ---
     recent = sorted(trades, key=lambda t: t["time"], reverse=True)[:20]
     trade_rows = "".join(f"""
         <tr><td class="num mut">{html.escape(t['time'][:16].replace('T', ' '))}</td>
         <td>{html.escape(LABEL[t['strategy']])}</td>
-        <td class="num">{html.escape(t['symbol'])}</td>
+        <td class="num">{html.escape(t['symbol'].replace('USDT', ''))}</td>
         <td><span class="tag {t['side']}">{t['side']}</span></td>
         <td class="num">{t['price']:,.4f}</td>
         <td class="mut">{html.escape(t['reason'])}</td>
@@ -462,7 +520,7 @@ def build_html(state, trades, live, generated):
         f'<span><span class="swatch" style="background:var(--{SERIES[s]})"></span>'
         f'{html.escape(LABEL[s])}</span>' for s in pt.STRATEGIES)
 
-    return f"""<title>Strategy Incubator</title>
+    return f"""<title>Bob</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
@@ -471,10 +529,11 @@ def build_html(state, trades, live, generated):
 
   <header>
     <div>
-      <h1>Strategy Incubator</h1>
-      <p class="tagline">Two rule-based strategies forward-tested on live crypto prices
-        with simulated money. No exchange account, no real capital — the point is to
-        find out which one holds up before either is trusted.</p>
+      <h1>Bob</h1>
+      <p class="tagline">Bob runs two rule-based strategies across {len(pt.SYMBOLS)} crypto
+        markets on live prices with simulated money, against a random-entry control
+        and buy-and-hold. No exchange account, no real capital. The question is not
+        which book is ahead — it is whether either beats noise.</p>
     </div>
     <div class="stamp">
       {pill}
@@ -532,23 +591,32 @@ def build_html(state, trades, live, generated):
       <tbody>{trade_rows}</tbody></table></div>
   </section>
 
-  <footer>Simulated trading only — no orders are placed and no real money is at risk.
-    Each book starts at {fmt_money(pt.INITIAL_CAPITAL)} of virtual capital across
-    {", ".join(pt.SYMBOLS)} on {pt.INTERVAL} candles, with a
-    {pt.ATR_MULT_SL}× ATR stop, {pt.RR}R target, and automatic halts after
+  <footer>Simulated trading only &mdash; no orders are placed and no real money is
+    at risk. Each strategy runs one {fmt_money(pt.INITIAL_CAPITAL)} account across
+    {len(pt.SYMBOLS)} markets on {pt.INTERVAL} candles, sizing every position at
+    1/{pt.MAX_CONCURRENT} of equity with a {pt.ATR_MULT_SL}&times; ATR stop and
+    {pt.RR}R target. The book halts for {pt.HALT_COOLDOWN_HOURS}h after
     {pt.MAX_CONSEC_LOSS} consecutive losses or a {pt.MAX_DD_PCT:.0f}% drawdown.</footer>
 </div>
 """
 
 
-def generate(out_file=OUT_FILE, live=None, fetch_live=True):
+def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None):
     """Render the dashboard. Pass `live` to reuse indicators already computed
     by the trading loop instead of re-fetching every symbol."""
     state = read_state()
     trades = read_trades()
+    if bench is None:
+        b = pt.Benchmark()
+        try:
+            with open(pt.STATE_FILE) as f:
+                b.load(json.load(f).get("benchmark", {}))
+        except (OSError, json.JSONDecodeError):
+            pass
+        bench = b.equity()
     if live is None:
         live = live_prices() if fetch_live else {}
-    page = build_html(state, trades, live, datetime.now(timezone.utc))
+    page = build_html(state, trades, live, datetime.now(timezone.utc), bench=bench)
     with open(out_file, "w") as f:
         f.write(page)
     return out_file, len(trades), len(state)

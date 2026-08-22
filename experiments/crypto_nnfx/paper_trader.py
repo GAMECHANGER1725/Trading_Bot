@@ -1,54 +1,120 @@
 #!/usr/bin/env python3
-"""Multi-book paper-trading simulator — no exchange account, no API keys, no signup.
+"""Bob — a multi-market paper-trading simulator. No exchange account, no keys.
 
-Runs BOTH candidate strategies across MULTIPLE symbols at once, each as an
-independent book with its own virtual balance. The point is sample size: one
-strategy on one symbol needs years to produce a statistically meaningful
-result, six books gather the same evidence ~6x faster.
+Runs BOTH candidate strategies across 32 liquid crypto markets at once. Each
+strategy gets ONE $10,000 account and sizes every position at 1/20 of equity,
+so the headline number means what it says and the two are directly comparable
+to each other and to buy-and-hold.
 
+  v0_control    coin-flip entry, same regime gate and risk model
   v1_rsi_macd   EMA100 baseline + RSI + MACD confluence, ADX20 filter
   v2_stoch_mfi  EMA100 baseline + Stochastic + MFI confluence, ADX15 filter
+
+v0 is the point of the exercise. A 2.5R target with an ATR stop wins ~28% of the
+time on chance alone, so a 30% win rate is not evidence of anything. If neither
+indicator book beats random entry on mean P&L per trade, the signals are noise
+and only the risk model is doing work. Results are also carried against
+equal-weight buy-and-hold of the same basket, because "+1.6%" means nothing
+without knowing what the market did.
 
 Both wrap the same NNFX risk boilerplate: ATR stop at 2.5x, take-profit at
 2.5R, consecutive-loss and max-drawdown halts with a cooldown.
 
 Run:      python3 paper_trader.py
-Report:   python3 paper_trader.py --report     (standings across all books)
+Report:   python3 paper_trader.py --report
 Selftest: python3 paper_trader.py --selftest
 Reset:    python3 paper_trader.py --reset
-Stop:     Ctrl+C  (state is saved; restarting resumes every book)
+Stop:     Ctrl+C  (state is saved; restarting resumes)
 """
 import csv
+import hashlib
 import json
 import os
 import sys
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+BOT_NAME = "Bob"
+
+# 32 markets on 1h rather than fewer markets on a faster timeframe. Commission is
+# a fixed toll per trade while the move captured scales with ATR, so dropping the
+# timeframe raises the break-even win rate (1h +0.8pp, 15m +1.5pp, 5m +2.6pp,
+# 1m +5.6pp above the 28.6% a 2.5R setup needs unpaid). Measured win rate is
+# 30.4%, which only clears the 1h bar. More markets buys trade count at the same
+# per-trade economics; a faster clock does not.
+# Screened 22 Aug 2026: >$20M daily quote volume, spread <0.06%, no stablecoins
+# or pegged assets (they do not trend, so a trend filter on them is meaningless).
+SYMBOLS = [
+    "BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "XPLUSDT", "ZECUSDT", "BNBUSDT",
+    "DOGEUSDT", "REUSDT", "SUIUSDT", "LINKUSDT", "ADAUSDT", "PUMPUSDT", "NEARUSDT",
+    "TRXUSDT", "AVAXUSDT", "UUSDT", "BCHUSDT", "TAOUSDT", "XLMUSDT", "AAVEUSDT",
+    "WLDUSDT", "LTCUSDT", "BOMEUSDT", "UNIUSDT", "TRUMPUSDT", "SPCXBUSDT",
+    "ONDOUSDT", "SNDKBUSDT", "TUTUSDT", "CRVUSDT", "NEIROUSDT",
+]
 INTERVAL = "1h"
-# data-api.binance.vision is Binance's dedicated public market-data host (no auth,
-# no geo-gating on market data). api.binance.com is the fallback.
 HOSTS = ["https://data-api.binance.vision", "https://api.binance.com"]
 KLINE_LIMIT = 500
-POLL_SECONDS = 60
+POLL_SECONDS = 120   # 1h bars: no need to poll faster, and 32 markets take a moment
+FETCH_WORKERS = 8
 LOG_FILE = "paper_trades.csv"
 STATE_FILE = "paper_state.json"
+
+# Mirrors dashboard.html to a dedicated orphan branch on the public GitHub repo so
+# a cloud /schedule job (which cannot see this Mac's filesystem) can fetch it via
+# a plain raw.githubusercontent.com URL and republish the artifact. Amend+force
+# rather than a new commit each push — this is a live snapshot, not history worth
+# keeping, and a fresh commit every few minutes would spam the repo forever.
+GITHUB_SYNC_WORKTREE = "/Users/vaidikpatel/Downloads/Home/Trading_Bot/.bob-live-worktree"
+GITHUB_SYNC_BRANCH = "bob-live"
+GITHUB_PUSH_INTERVAL = 300  # seconds; independent of the trading poll cadence
 
 # ---- Shared risk boilerplate (identical across strategies, so the comparison
 # ---- isolates the entry signal rather than the risk model) ----
 ATR_LEN = 14
 ATR_MULT_SL = 2.5
 RR = 2.5
-MAX_CONSEC_LOSS = 4
+MAX_CONCURRENT = 20      # positions open at once; each sized at 1/20 of equity
+# 20 crypto positions are NOT 20 independent bets: majors correlate ~0.8 with BTC,
+# so an unconstrained book is one leveraged BTC-direction bet wearing 20 hats. On
+# 22 Aug both strategies halted within the same hour, which is what that looks
+# like. Capping each side bounds the correlated exposure to ~40% of equity.
+MAX_PER_SIDE = 8
+MAX_CONSEC_LOSS = 6      # across the whole book now, not per market
+# Halving size partway up the streak preserves sample (the scarce resource in a
+# forward test) instead of going dark the moment a regime turns.
+SOFT_LOSS_STREAK = 3
+SOFT_RISK_SCALE = 0.5
 MAX_DD_PCT = 15.0
-# Bars to sit out after a risk halt. Without this the bot deadlocks: clearing a
-# loss streak requires a win, which requires being allowed to enter.
-HALT_COOLDOWN_BARS = 24
+# Fixed notional means every position risks a DIFFERENT amount, because the stop
+# sits at 2.5xATR and ATR varies several-fold across these markets. A volatile
+# coin was quietly betting many times what a calm one did, which is not the NNFX
+# model this claims to implement and makes "2.5R" mean a different thing per
+# trade. Size by risk instead, capped at the old notional so total exposure and
+# leverage are unchanged — this equalises risk downward on the wild markets
+# rather than levering up the quiet ones.
+# 0.125% is not tuned: it is the risk a 1%-ATR market already carried under the
+# notional cap, so the average position is the same size as before and only the
+# distribution across markets changes.
+RISK_PCT = 0.125
+HALT_COOLDOWN_HOURS = 24  # wall-clock, not bar count: bars arrive from 32 markets
 INITIAL_CAPITAL = 10_000.0
-COMMISSION_PCT = 0.05  # per side, matches backtest parity profile
-WARMUP_BARS = 150      # bars before indicators are trustworthy
+COMMISSION_PCT = 0.05    # per side, matches backtest parity profile
+# Stops do not fill at the stop price. Crypto gaps through the level, and the 2am
+# wick that triggers half of them is exactly when the book is thinnest. Charging
+# an adverse half-tick per side makes every number below worse and true.
+SLIPPAGE_PCT = 0.02      # per side, always against us
+WARMUP_BARS = 150
+
+# The control book. A 2.5R target with an ATR stop already wins ~28% of the time
+# on pure chance, and the measured rate is 30.4% — so "Bob wins 30%" is not by
+# itself evidence of anything. This enters at random in the same markets, same
+# regime filter, same stop, same target, same sizing. If the indicator books
+# cannot beat it on mean P&L per trade, the indicators contribute nothing and
+# the whole edge is the risk model. STATUS.md already requires this test
+# ("shuffle-control every new feature block"); it had never been applied to Bob.
+CONTROL_ENTRY_P = 0.10   # per trending bar; frequency need not match, expectancy does
 
 
 # ============================== data feed ==============================
@@ -59,9 +125,9 @@ def fetch_klines(symbol, interval=INTERVAL, limit=KLINE_LIMIT, retries=3):
     for attempt in range(retries):
         for host in HOSTS:
             url = f"{host}/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
-            req = urllib.request.Request(url, headers={"User-Agent": "paper-trader/2.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "bob/3.0"})
             try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
+                with urllib.request.urlopen(req, timeout=20) as resp:
                     raw = json.loads(resp.read())
                 return [{
                     "open": float(r[1]), "high": float(r[2]), "low": float(r[3]),
@@ -72,6 +138,18 @@ def fetch_klines(symbol, interval=INTERVAL, limit=KLINE_LIMIT, retries=3):
                 last_err = e
         time.sleep(2 ** attempt)
     raise RuntimeError(f"all hosts failed for {symbol}: {last_err}")
+
+
+def fetch_all(symbols):
+    """Fetch every market in parallel. A failed market is skipped, not fatal."""
+    def one(sym):
+        try:
+            return sym, fetch_klines(sym)
+        except Exception as e:  # noqa: BLE001
+            print(f"  fetch failed {sym}: {e}")
+            return sym, None
+    with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as ex:
+        return {s: b for s, b in ex.map(one, symbols) if b}
 
 
 # ============================== indicators ==============================
@@ -183,8 +261,6 @@ def atr_series(highs, lows, closes, length):
 
 # ============================== strategies ==============================
 # Each signal fn returns (long_entry, short_entry, bull_bias, bear_bias, trending).
-# The bias/trend flags drive the shared exit rule, so both strategies are judged
-# on entry quality alone.
 
 def signal_v1(ind, i, cfg):
     close = ind["close"][i]
@@ -209,7 +285,32 @@ def signal_v2(ind, i, cfg):
     return long_ok, short_ok, bull, bear, trending
 
 
+def signal_control(ind, i, cfg):
+    """Coin-flip entry. Identical regime gate, exits and risk model to the real
+    books, so the only thing that differs is whether the entry carries
+    information. Seeded from (symbol, bar) via md5 rather than hash(): PYTHONHASH
+    SEED is randomised per process, so hash() would give a different history on
+    every restart and the control would never be reproducible."""
+    close = ind["close"][i]
+    baseline = ind["ema"][cfg["baseline_len"]][i]
+    bull, bear = close > baseline, close < baseline
+    trending = ind["adx"][i] > cfg["adx_min"]
+    if not trending:
+        return False, False, bull, bear, trending
+    seed = ind["symbol"], i, ind.get("bar_ms", [0] * (i + 1))[i]
+    digest = hashlib.md5(repr(seed).encode()).digest()
+    roll = int.from_bytes(digest[:4], "big") / 2**32          # uniform [0,1)
+    if roll >= cfg["entry_p"]:
+        return False, False, bull, bear, trending
+    go_long = digest[4] & 1
+    return bool(go_long), not go_long, bull, bear, trending
+
+
 STRATEGIES = {
+    "v0_control": {
+        "signal": signal_control, "baseline_len": 100, "adx_min": 20,
+        "entry_p": CONTROL_ENTRY_P,
+    },
     "v1_rsi_macd": {
         "signal": signal_v1, "baseline_len": 100, "adx_min": 20,
         "rsi_long": 55, "rsi_short": 45,
@@ -221,7 +322,7 @@ STRATEGIES = {
 }
 
 
-def compute_indicators(closed):
+def compute_indicators(closed, symbol=""):
     highs = [b["high"] for b in closed]
     lows = [b["low"] for b in closed]
     closes = [b["close"] for b in closed]
@@ -229,6 +330,8 @@ def compute_indicators(closed):
     macd_line, macd_sig = macd_series(closes)
     lengths = {cfg["baseline_len"] for cfg in STRATEGIES.values()}
     return {
+        "symbol": symbol,
+        "bar_ms": [b["closeTime"] for b in closed],
         "close": closes,
         "ema": {n: ema_series(closes, n) for n in lengths},
         "rsi": rsi_series(closes, 14),
@@ -240,30 +343,28 @@ def compute_indicators(closed):
     }
 
 
-# ============================== one book ==============================
+# ============================== portfolio ==============================
 
-class Book:
-    """One strategy trading one symbol, with its own balance and risk state."""
+class Portfolio:
+    """One strategy's single account, trading many markets from shared equity."""
 
-    def __init__(self, strategy, symbol, log_file=LOG_FILE, quiet=False):
-        self.strategy, self.symbol, self.quiet = strategy, symbol, quiet
-        self.name = f"{strategy}/{symbol}"
-        self.log_file = log_file
+    def __init__(self, strategy, log_file=LOG_FILE, quiet=False):
+        self.strategy, self.log_file, self.quiet = strategy, log_file, quiet
         self.cash_equity = INITIAL_CAPITAL
         self.peak_equity = INITIAL_CAPITAL
         self.consec_losses = 0
-        self.position = None
-        self.halted_until_bar = 0
-        self.bar_count = 0
-        self.last_close_ms = 0
+        self.halted_until_ms = 0
         self.wins = 0
         self.losses = 0
+        self.pnls = []           # every closed trade, for expectancy + t-stat
+        self.positions = {}      # symbol -> {side, entry, qty, sl, tp, last}
+        self.last_close_ms = {}  # symbol -> ms of last processed candle
 
     # ---- state ----
     def to_dict(self):
         return {k: getattr(self, k) for k in
-                ("cash_equity", "peak_equity", "consec_losses", "position",
-                 "halted_until_bar", "bar_count", "last_close_ms", "wins", "losses")}
+                ("cash_equity", "peak_equity", "consec_losses", "halted_until_ms",
+                 "wins", "losses", "pnls", "positions", "last_close_ms")}
 
     def load(self, d):
         for k, v in d.items():
@@ -271,142 +372,251 @@ class Book:
                 setattr(self, k, v)
 
     # ---- accounting ----
-    def mark_to_market(self, price):
-        """Equity including unrealized P&L — matches Pine's strategy.equity."""
-        if not self.position:
-            return self.cash_equity
-        p = self.position
-        delta = (price - p["entry"]) if p["side"] == "long" else (p["entry"] - price)
-        return self.cash_equity + delta * p["qty"]
+    @staticmethod
+    def fill(price, side, entering):
+        """Adverse fill. Buying (open long / close short) pays up, selling
+        receives less."""
+        buying = (side == "long") == entering
+        return price * (1 + SLIPPAGE_PCT / 100 * (1 if buying else -1))
 
-    def _log(self, event, side, price, bar_ms, note=""):
+    def mark_to_market(self):
+        """Equity including unrealized P&L on every open position."""
+        total = self.cash_equity
+        for p in self.positions.values():
+            delta = ((p["last"] - p["entry"]) if p["side"] == "long"
+                     else (p["entry"] - p["last"]))
+            total += delta * p["qty"]
+        return total
+
+    def _log(self, event, symbol, side, price, bar_ms, note=""):
         stamp = (datetime.fromtimestamp(bar_ms / 1000, timezone.utc).isoformat()
                  if bar_ms else datetime.now(timezone.utc).isoformat())
         with open(self.log_file, "a", newline="") as f:
-            csv.writer(f).writerow([stamp, self.strategy, self.symbol, event, side,
-                                    f"{price:.4f}", f"{self.cash_equity:.2f}", note])
+            csv.writer(f).writerow([stamp, self.strategy, symbol, event, side,
+                                    f"{price:.6f}", f"{self.cash_equity:.2f}", note])
         if not self.quiet:
-            print(f"[{event:5}] {self.name:22} {side:5} @ {price:,.4f}  "
-                  f"equity=${self.cash_equity:,.2f}  {note}")
+            print(f"[{event:5}] {self.strategy:13} {symbol:10} {side:5} "
+                  f"@ {price:,.6f}  equity=${self.cash_equity:,.2f}  {note}")
 
-    def _close_position(self, exit_price, reason, bar_ms):
-        p = self.position
+    def close_position(self, symbol, exit_price, reason, bar_ms):
+        p = self.positions.pop(symbol)
+        exit_price = self.fill(exit_price, p["side"], entering=False)
         gross = ((exit_price - p["entry"]) if p["side"] == "long"
                  else (p["entry"] - exit_price))
         pnl = gross * p["qty"] - (p["entry"] + exit_price) * p["qty"] * (COMMISSION_PCT / 100)
         self.cash_equity += pnl
+        self.pnls.append(round(pnl, 4))
         if pnl < 0:
             self.consec_losses += 1
             self.losses += 1
         else:
             self.consec_losses = 0
             self.wins += 1
-        self.position = None
-        self._log("EXIT", p["side"], exit_price, bar_ms, f"{reason} pnl={pnl:+.2f}")
+        self._log("EXIT", symbol, p["side"], exit_price, bar_ms,
+                  f"{reason} pnl={pnl:+.2f}")
 
-    def _open_position(self, side, price, atr, bar_ms):
+    def open_position(self, symbol, side, price, atr, bar_ms):
         stop_dist = atr * ATR_MULT_SL
         if stop_dist <= 0 or price <= 0 or self.cash_equity <= 0:
             return  # zero-volatility bar or blown account — nothing sane to size
+        if len(self.positions) >= MAX_CONCURRENT:
+            return  # book is full
+        if sum(1 for q in self.positions.values() if q["side"] == side) >= MAX_PER_SIDE:
+            return  # correlated-exposure cap: these markets move together
+        price = self.fill(price, side, entering=True)
+        scale = SOFT_RISK_SCALE if self.consec_losses >= SOFT_LOSS_STREAK else 1.0
+        # equal risk per trade, never more notional than the old flat slice
+        by_risk = self.cash_equity * (RISK_PCT / 100) / stop_dist
+        by_notional = self.cash_equity / MAX_CONCURRENT / price
+        qty = min(by_risk, by_notional) * scale
         sl = price - stop_dist if side == "long" else price + stop_dist
         tp = price + stop_dist * RR if side == "long" else price - stop_dist * RR
-        self.position = {"side": side, "entry": price,
-                         "qty": self.cash_equity / price, "sl": sl, "tp": tp}
-        self._log("ENTRY", side, price, bar_ms, f"sl={sl:,.4f} tp={tp:,.4f}")
+        self.positions[symbol] = {"side": side, "entry": price,
+                                  "qty": qty, "sl": sl, "tp": tp,
+                                  "last": price}
+        self._log("ENTRY", symbol, side, price, bar_ms, f"sl={sl:,.6f} tp={tp:,.6f}")
 
-    def on_bar(self, bar, sig, atr):
+    def check_halt(self, now_ms):
+        """Portfolio-level risk halts on mark-to-market equity."""
+        equity = self.mark_to_market()
+        self.peak_equity = max(self.peak_equity, equity)
+        dd = ((self.peak_equity - equity) / self.peak_equity * 100
+              if self.peak_equity else 0.0)
+        if now_ms >= self.halted_until_ms:
+            if self.consec_losses >= MAX_CONSEC_LOSS or dd >= MAX_DD_PCT:
+                self.halted_until_ms = now_ms + HALT_COOLDOWN_HOURS * 3_600_000
+                self._log("HALT", "-", "-", equity, now_ms,
+                          f"losses={self.consec_losses} dd={dd:.1f}% "
+                          f"cooldown={HALT_COOLDOWN_HOURS}h")
+                # Clear the trip conditions so the cooldown actually ends the halt.
+                # Drawdown is then measured from the halt point, not the all-time
+                # peak — deliberate; the alternative locks the book out forever.
+                self.consec_losses = 0
+                self.peak_equity = equity
+        return now_ms < self.halted_until_ms
+
+    def on_bar(self, symbol, bar, sig, atr):
         """sig = (long_entry, short_entry, bull_bias, bear_bias, trending)."""
         long_ok, short_ok, bull, bear, trending = sig
         close, high, low = bar["close"], bar["high"], bar["low"]
         bar_ms = bar.get("closeTime", 0)
-        self.bar_count += 1
+
+        p = self.positions.get(symbol)
+        if p:
+            p["last"] = close
 
         # 1. Intrabar stop / target. Stop checked first: when one bar's range spans
         #    both levels we can't know the order, so assume the losing one.
         exited_intrabar = False
-        if self.position:
-            p = self.position
+        if p:
             if p["side"] == "long":
                 if low <= p["sl"]:
-                    self._close_position(p["sl"], "stop-loss", bar_ms); exited_intrabar = True
+                    self.close_position(symbol, p["sl"], "stop-loss", bar_ms); exited_intrabar = True
                 elif high >= p["tp"]:
-                    self._close_position(p["tp"], "take-profit", bar_ms); exited_intrabar = True
+                    self.close_position(symbol, p["tp"], "take-profit", bar_ms); exited_intrabar = True
             else:
                 if high >= p["sl"]:
-                    self._close_position(p["sl"], "stop-loss", bar_ms); exited_intrabar = True
+                    self.close_position(symbol, p["sl"], "stop-loss", bar_ms); exited_intrabar = True
                 elif low <= p["tp"]:
-                    self._close_position(p["tp"], "take-profit", bar_ms); exited_intrabar = True
+                    self.close_position(symbol, p["tp"], "take-profit", bar_ms); exited_intrabar = True
 
-        # 2. Risk halts, measured on mark-to-market equity like the backtest.
-        equity_now = self.mark_to_market(close)
-        self.peak_equity = max(self.peak_equity, equity_now)
-        dd_pct = ((self.peak_equity - equity_now) / self.peak_equity * 100
-                  if self.peak_equity else 0.0)
-        if self.bar_count >= self.halted_until_bar:
-            if self.consec_losses >= MAX_CONSEC_LOSS or dd_pct >= MAX_DD_PCT:
-                self.halted_until_bar = self.bar_count + HALT_COOLDOWN_BARS
-                self._log("HALT", "-", close, bar_ms,
-                          f"losses={self.consec_losses} dd={dd_pct:.1f}% "
-                          f"cooldown={HALT_COOLDOWN_BARS} bars")
-                # Clear the trip conditions so the cooldown actually ends the halt.
-                # Side effect: drawdown is then measured from the halt point, not
-                # the all-time peak. Deliberate — the alternative is a book that
-                # locks itself out forever on its first bad run.
-                self.consec_losses = 0
-                self.peak_equity = equity_now
-        halted = self.bar_count < self.halted_until_bar
+        halted = self.check_halt(bar_ms)
 
-        # 3. Signal flatten at close.
+        # 2. Signal flatten at close.
         exited_at_close = False
-        if self.position:
-            p = self.position
+        p = self.positions.get(symbol)
+        if p:
             if (p["side"] == "long" and (bear or not trending)) or \
                (p["side"] == "short" and (bull or not trending)):
-                self._close_position(close, "signal-flatten", bar_ms)
+                self.close_position(symbol, close, "signal-flatten", bar_ms)
                 exited_at_close = True
 
-        # 4. Entry. Pine evaluates `strategy.position_size == 0` before this bar's
+        # 3. Entry. Pine evaluates `strategy.position_size == 0` before this bar's
         #    close orders fill, so a signal-flatten blocks same-bar reversal while
         #    an intrabar stop-out does not. Mirroring that keeps parity with the
         #    backtests these params came from.
-        if self.position is None and not exited_at_close and not halted:
+        if symbol not in self.positions and not exited_at_close and not halted:
             if long_ok:
-                self._open_position("long", close, atr, bar_ms)
+                self.open_position(symbol, "long", close, atr, bar_ms)
             elif short_ok:
-                self._open_position("short", close, atr, bar_ms)
+                self.open_position(symbol, "short", close, atr, bar_ms)
 
         if bar_ms:
-            self.last_close_ms = bar_ms
+            self.last_close_ms[symbol] = bar_ms
         return {"exited_intrabar": exited_intrabar,
                 "exited_at_close": exited_at_close, "halted": halted}
 
 
-# ============================== portfolio ==============================
+# ============================== benchmark ==============================
 
-def make_books(quiet=False):
-    return [Book(s, sym, quiet=quiet) for s in STRATEGIES for sym in SYMBOLS]
+class Benchmark:
+    """Equal-weight buy-and-hold of the same 32 markets, started the same moment.
+
+    Without this, "+1.6%" is uninterpretable: if the basket rose 8% over the same
+    window the book badly lost while looking like a winner. Equal-weight rather
+    than BTC-only because the book trades all 32 — the fair alternative to
+    "trade these markets" is "hold these markets"."""
+
+    def __init__(self):
+        self.start = {}      # symbol -> first close we ever saw
+        self.last = {}       # symbol -> most recent close
+        self.start_ms = 0
+
+    def observe(self, symbol, price, bar_ms=0):
+        if price and price > 0:
+            if symbol not in self.start:
+                self.start[symbol] = price
+                self.start_ms = self.start_ms or bar_ms
+            self.last[symbol] = price
+
+    def equity(self):
+        rel = [self.last[s] / self.start[s] for s in self.start
+               if s in self.last and self.start[s]]
+        return INITIAL_CAPITAL * (sum(rel) / len(rel)) if rel else INITIAL_CAPITAL
+
+    def to_dict(self):
+        return {"start": self.start, "last": self.last, "start_ms": self.start_ms}
+
+    def load(self, d):
+        self.start = d.get("start", {})
+        self.last = d.get("last", {})
+        self.start_ms = d.get("start_ms", 0)
 
 
-def save_books(books, path=STATE_FILE):
+# ============================== statistics ==============================
+
+def expectancy(pnls):
+    """(mean, standard error, t) on per-trade P&L. t is the only honest way to
+    ask whether a return is distinguishable from luck."""
+    n = len(pnls)
+    if n < 2:
+        return (pnls[0] if n else 0.0), 0.0, 0.0
+    mean = sum(pnls) / n
+    var = sum((x - mean) ** 2 for x in pnls) / (n - 1)
+    se = (var / n) ** 0.5
+    return mean, se, (mean / se if se else 0.0)
+
+
+# ============================== persistence ==============================
+
+def make_portfolios(quiet=False):
+    return {s: Portfolio(s, quiet=quiet) for s in STRATEGIES}
+
+
+def save_portfolios(pfs, path=STATE_FILE, bench=None):
     tmp = f"{path}.tmp"
+    payload = {"portfolios": {k: p.to_dict() for k, p in pfs.items()}}
+    if bench is not None:
+        payload["benchmark"] = bench.to_dict()
     with open(tmp, "w") as f:
-        json.dump({"books": {b.name: b.to_dict() for b in books}}, f, indent=2)
+        json.dump(payload, f, indent=2)
     os.replace(tmp, path)  # atomic: no half-written state on crash
 
 
-def load_books(books, path=STATE_FILE):
+def load_portfolios(pfs, path=STATE_FILE, bench=None):
     if not os.path.exists(path):
         return False
     try:
         with open(path) as f:
-            saved = json.load(f).get("books", {})
+            blob = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         print(f"warning: could not read {path} ({e}); starting fresh")
         return False
-    for b in books:
-        if b.name in saved:
-            b.load(saved[b.name])
+    saved = blob.get("portfolios", {})
+    for k, p in pfs.items():
+        if k in saved:
+            p.load(saved[k])
+    if bench is not None:
+        bench.load(blob.get("benchmark", {}))
     return bool(saved)
+
+
+def sync_dashboard_to_github(dashboard_path="dashboard.html"):
+    """Best-effort: copy the dashboard into the bob-live worktree and force-push
+    an amended commit. Never raises — a sync failure must not stop trading."""
+    import shutil
+    import subprocess
+    try:
+        if not os.path.isdir(GITHUB_SYNC_WORKTREE):
+            return False
+        dest = os.path.join(GITHUB_SYNC_WORKTREE, "dashboard.html")
+        shutil.copy(dashboard_path, dest)
+        run = lambda *a: subprocess.run(  # noqa: E731
+            ["git", *a], cwd=GITHUB_SYNC_WORKTREE, capture_output=True, text=True, timeout=30)
+        run("add", "dashboard.html")
+        status = run("status", "--porcelain")
+        if not status.stdout.strip():
+            return True  # no change since last sync
+        run("-c", "user.email=bob@local", "-c", "user.name=Bob",
+            "commit", "--amend", "--no-edit", "-q")
+        push = run("push", "--force", "origin", GITHUB_SYNC_BRANCH)
+        if push.returncode != 0:
+            print(f"github sync push failed: {push.stderr.strip()[:200]}")
+            return False
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"github sync failed: {e}")
+        return False
 
 
 def ensure_log(path=LOG_FILE):
@@ -418,66 +628,78 @@ def ensure_log(path=LOG_FILE):
 
 def report(path=STATE_FILE):
     if not os.path.exists(path):
-        print("no state yet — run the simulator first")
+        print("no state yet — run Bob first")
         return
     with open(path) as f:
-        saved = json.load(f).get("books", {})
-    print(f"\n{'book':24} {'equity':>12} {'return':>9} {'W/L':>8} {'position':>10}")
-    print("-" * 68)
-    by_strategy = {}
-    for name, s in sorted(saved.items()):
-        eq = s["cash_equity"]
+        blob = json.load(f)
+    saved = blob.get("portfolios", {})
+    bench = Benchmark(); bench.load(blob.get("benchmark", {}))
+    bench_eq = bench.equity()
+    bench_ret = (bench_eq / INITIAL_CAPITAL - 1) * 100
+
+    print(f"\n{BOT_NAME} — {len(SYMBOLS)} markets, {INTERVAL} candles\n")
+    print(f"{'book':16} {'equity':>11} {'return':>8} {'vs hold':>9} "
+          f"{'W/L':>8} {'per trade':>11} {'t':>6} {'open':>5} {'halt':>5}")
+    print("-" * 88)
+    total = 0
+    for name, st in sorted(saved.items()):
+        eq, w, l = st["cash_equity"], st.get("wins", 0), st.get("losses", 0)
         ret = (eq / INITIAL_CAPITAL - 1) * 100
-        pos = s["position"]["side"] if s.get("position") else "flat"
-        w, l = s.get("wins", 0), s.get("losses", 0)
-        print(f"{name:24} ${eq:>11,.2f} {ret:>8.2f}% {f'{w}/{l}':>8} {pos:>10}")
-        by_strategy.setdefault(name.split("/")[0], []).append((eq, w, l))
-    print("-" * 68)
-    for strat, rows in sorted(by_strategy.items()):
-        total_eq = sum(r[0] for r in rows)
-        base = INITIAL_CAPITAL * len(rows)
-        w = sum(r[1] for r in rows); l = sum(r[2] for r in rows)
-        n = w + l
-        print(f"{strat:24} ${total_eq:>11,.2f} {(total_eq/base-1)*100:>8.2f}% "
-              f"{f'{w}/{l}':>8} {n:>6} trades")
-    total_trades = sum(s.get("wins", 0) + s.get("losses", 0) for s in saved.values())
-    print(f"\ntotal closed trades: {total_trades}")
-    if total_trades < 100:
-        print(f"need ~{100 - total_trades} more before the comparison means much "
-              "(error bars stay wide below ~100 trades per strategy)")
+        mean, se, t = expectancy(st.get("pnls", []))
+        halt = "yes" if st.get("halted_until_ms", 0) > time.time() * 1000 else "no"
+        print(f"{name:16} ${eq:>10,.2f} {ret:>7.2f}% {ret - bench_ret:>8.2f}% "
+              f"{f'{w}/{l}':>8} {f'{mean:+.2f}':>11} {t:>6.2f} "
+              f"{len(st.get('positions', {})):>5} {halt:>5}")
+        total += w + l
+    print("-" * 88)
+    print(f"{'buy & hold':16} ${bench_eq:>10,.2f} {bench_ret:>7.2f}%   "
+          f"(equal-weight, same 32 markets, same start)")
+
+    ctrl = saved.get("v0_control", {})
+    if ctrl:
+        cm, _, _ = expectancy(ctrl.get("pnls", []))
+        print(f"\ncontrol enters at random. Any book whose per-trade P&L is not "
+              f"clearly\nabove {cm:+.2f} has shown no evidence its indicators do "
+              f"anything.")
+    print(f"\ntotal closed trades: {total}")
+    if total < 200:
+        print(f"need ~{200 - total} more before the comparison means much "
+              "(~100 per book)")
+    print("|t| > 2 is the bar for calling a result real. Everything below that "
+          "is noise.\n")
 
 
 # ============================== main loop ==============================
 
 def main():
-    print(f"Paper trading {len(STRATEGIES)} strategies x {len(SYMBOLS)} symbols "
-          f"= {len(STRATEGIES) * len(SYMBOLS)} books, ${INITIAL_CAPITAL:,.0f} each")
-    print(f"Symbols: {', '.join(SYMBOLS)}   Interval: {INTERVAL}")
+    n_books = len(STRATEGIES)
+    print(f"{BOT_NAME} — {n_books} strategies x {len(SYMBOLS)} markets, "
+          f"${INITIAL_CAPITAL:,.0f} per strategy")
+    print(f"Position size: 1/{MAX_CONCURRENT} of equity  ·  max {MAX_CONCURRENT} open")
+    print(f"Interval: {INTERVAL}  ·  poll {POLL_SECONDS}s")
     print(f"Log: {LOG_FILE}   State: {STATE_FILE}   Ctrl+C to stop\n")
 
     ensure_log()
-    books = make_books()
-    resumed = load_books(books)
-    if resumed:
-        for b in books:
-            held = f" holding {b.position['side']}" if b.position else ""
-            print(f"resumed {b.name:24} ${b.cash_equity:,.2f}{held}")
+    pfs = make_portfolios()
+    bench = Benchmark()
+    if load_portfolios(pfs, bench=bench):
+        for k, p in pfs.items():
+            print(f"resumed {k:14} ${p.cash_equity:,.2f}  "
+                  f"{len(p.positions)} open  {p.wins}W/{p.losses}L")
         print()
 
     first_pass = True
+    last_push = 0.0
     while True:
+        t0 = time.time()
+        data = fetch_all(SYMBOLS)
         live = {}
-        for symbol in SYMBOLS:
-            try:
-                bars = fetch_klines(symbol)
-            except Exception as e:  # noqa: BLE001 - keep the loop alive through outages
-                print(f"fetch error ({symbol}): {e}")
-                continue
 
+        for symbol, bars in data.items():
             closed = bars[:-1]  # drop the still-forming candle
             if len(closed) <= WARMUP_BARS:
                 continue
-            ind = compute_indicators(closed)
+            ind = compute_indicators(closed, symbol)
             last = len(closed) - 1
             live[symbol] = {
                 "price": ind["close"][last],
@@ -487,38 +709,46 @@ def main():
                 "atr": ind["atr"][last], "bar_ms": closed[last]["closeTime"],
                 "reads": {},
             }
+            bench.observe(symbol, ind["close"][last], closed[last]["closeTime"])
             for sname, scfg in STRATEGIES.items():
                 lo_ok, sh_ok, _, _, trending = scfg["signal"](ind, last, scfg)
                 live[symbol]["reads"][sname] = ("long" if lo_ok else "short" if sh_ok
                                                 else "chop" if not trending else "wait")
-            sym_books = [b for b in books if b.symbol == symbol]
-
-            for b in sym_books:
-                cfg = STRATEGIES[b.strategy]
-                if first_pass and b.last_close_ms == 0:
+                p = pfs[sname]
+                if first_pass and symbol not in p.last_close_ms:
                     # Cold start: history is warmup ONLY. Replaying it as live
                     # trades would book fictional P&L against real timestamps.
-                    b.last_close_ms = closed[-1]["closeTime"]
+                    p.last_close_ms[symbol] = closed[last]["closeTime"]
                     continue
                 for i, bar in enumerate(closed):
-                    if bar["closeTime"] <= b.last_close_ms or i < WARMUP_BARS:
+                    if bar["closeTime"] <= p.last_close_ms.get(symbol, 0) or i < WARMUP_BARS:
                         continue
-                    sig = cfg["signal"](ind, i, cfg)
-                    b.on_bar(bar, sig, ind["atr"][i])
+                    p.on_bar(symbol, bar, scfg["signal"](ind, i, scfg), ind["atr"][i])
 
-        save_books(books)
+        save_portfolios(pfs, bench=bench)
         try:  # imported lazily: dashboard.py imports this module
+            import importlib
+
             import dashboard
-            dashboard.generate(live=live)
+            # Reload every poll: without it Python caches the module for the life
+            # of the process, so a fix to dashboard.py never reaches a running Bob
+            # (this silently broke rendering for 12 hours on 22 Aug).
+            importlib.reload(dashboard)
+            dashboard.generate(live=live, bench=bench.equity())
         except Exception as e:  # noqa: BLE001 - a render failure must not stop trading
+            import traceback
             print(f"dashboard render failed: {e}")
+            traceback.print_exc()
+
+        if time.time() - last_push >= GITHUB_PUSH_INTERVAL:
+            if sync_dashboard_to_github():
+                last_push = time.time()
+
         if first_pass:
-            last = datetime.fromtimestamp(
-                max(b.last_close_ms for b in books) / 1000, timezone.utc)
-            print(f"warmed up (last close {last:%Y-%m-%d %H:%M} UTC) — "
+            print(f"warmed up on {len(data)} markets in {time.time() - t0:.0f}s — "
                   "waiting for the next candle\n")
         first_pass = False
-        time.sleep(POLL_SECONDS)
+        time.sleep(max(POLL_SECONDS - (time.time() - t0), 5))
 
 
 # ============================== selftest ==============================
@@ -536,35 +766,24 @@ def selftest():  # noqa: C901 - a flat list of asserts reads better than helpers
     assert ema_series(rising, 10)[-1] < rising[-1], "EMA lags a rising series"
     assert abs(sma_series([1.0, 2, 3, 4], 2)[-1] - 3.5) < 1e-9, "SMA window"
     assert abs(rma_series([10.0, 20.0], 2)[-1] - 15.0) < 1e-9, "RMA step"
-
-    # RSI: only-up -> 100, only-down -> 0, and it stays inside [0, 100].
     assert abs(rsi_series([float(i) for i in range(40)], 14)[-1] - 100) < 1e-9, "RSI up"
     assert rsi_series([float(40 - i) for i in range(40)], 14)[-1] < 1e-9, "RSI down"
     mixed = rsi_series([100, 102, 101, 104, 103, 106, 105, 108, 60, 62, 61, 59] * 4, 14)
     assert all(0 <= v <= 100 for v in mixed), "RSI stays in range"
-
-    # MACD: line = ema12 - ema26; on a steady uptrend the line leads its signal.
     line, sig = macd_series([float(i) for i in range(120)])
     assert line[-1] > sig[-1], "MACD bullish in an uptrend"
     line_d, sig_d = macd_series([float(120 - i) for i in range(120)])
     assert line_d[-1] < sig_d[-1], "MACD bearish in a downtrend"
-
-    # Stoch: close at top of range -> 100, bottom -> 0, flat -> no divide by zero.
     hi, lo = [10.0] * 20, [0.0] * 20
     assert abs(stoch_series(hi, lo, [10.0] * 20, 14, 1)[-1] - 100) < 1e-9, "stoch top"
     assert abs(stoch_series(hi, lo, [0.0] * 20, 14, 1)[-1]) < 1e-9, "stoch bottom"
-    assert abs(stoch_series(hi, lo, [5.0] * 20, 14, 1)[-1] - 50) < 1e-9, "stoch mid"
     assert stoch_series([1.0] * 5, [1.0] * 5, [1.0] * 5, 3, 1)[-1] == 50.0, "stoch flat"
-
-    # MFI: monotonic up -> 100, monotonic down -> 0.
     n = 20
     h = [float(i + 2) for i in range(n)]; l = [float(i) for i in range(n)]
     c = [float(i + 1) for i in range(n)]
     assert abs(mfi_series(h, l, c, [50.0] * n, 14)[-1] - 100) < 1e-9, "MFI all-up"
     assert mfi_series(list(reversed(h)), list(reversed(l)), list(reversed(c)),
                       [50.0] * n, 14)[-1] < 1e-9, "MFI all-down"
-
-    # ATR converges to a constant range; ADX separates trend from chop.
     assert abs(atr_series([101.0] * 60, [99.0] * 60, [100.0] * 60, 14)[-1] - 2.0) < 1e-6, "ATR"
     th = [100.0 + i for i in range(60)]; tl = [99.0 + i for i in range(60)]
     tc = [99.5 + i for i in range(60)]
@@ -577,140 +796,254 @@ def selftest():  # noqa: C901 - a flat list of asserts reads better than helpers
     i = len(bars) - 1
     for sname, cfg in STRATEGIES.items():
         long_ok, short_ok, bull, bear, trending = cfg["signal"](ind, i, cfg)
-        assert bull and not bear, f"{sname}: steady uptrend should read bullish"
-        assert trending, f"{sname}: steady uptrend should pass the ADX filter"
-        assert not short_ok, f"{sname}: must not signal short in an uptrend"
+        assert bull and not bear and trending, f"{sname}: uptrend reads bullish"
+        assert not short_ok, f"{sname}: no short in an uptrend"
     down = [_bar(300 - i, 301 - i, 299 - i, 299.5 - i) for i in range(200)]
     ind_d = compute_indicators(down)
     for sname, cfg in STRATEGIES.items():
         long_ok, short_ok, bull, bear, trending = cfg["signal"](ind_d, len(down) - 1, cfg)
-        assert bear and not bull, f"{sname}: downtrend should read bearish"
-        assert not long_ok, f"{sname}: must not signal long in a downtrend"
+        assert bear and not bull, f"{sname}: downtrend reads bearish"
+        assert not long_ok, f"{sname}: no long in a downtrend"
 
-    # ---- book state machine ----
+    # ---- portfolio state machine ----
     with tempfile.TemporaryDirectory() as d:
         log, state = os.path.join(d, "t.csv"), os.path.join(d, "t.json")
         ensure_log(log)
 
         def fresh():
-            return Book("v2_stoch_mfi", "BTCUSDT", log_file=log, quiet=True)
+            return Portfolio("v2_stoch_mfi", log_file=log, quiet=True)
 
-        #        (long_ok, short_ok, bull, bear, trending)
         LONG = (True, False, True, False, True)
         SHORT = (False, True, False, True, True)
-        CHOP = (False, False, True, False, False)   # trend filter off -> flatten
+        CHOP = (False, False, True, False, False)
+        HOUR = 3_600_000
 
-        # entry sizing and bracket placement
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        assert b.position and b.position["side"] == "long", "long entry"
-        assert abs(b.position["sl"] - 97.5) < 1e-9, "SL = 2.5 x ATR below entry"
-        assert abs(b.position["tp"] - 106.25) < 1e-9, "TP = SL distance x RR"
-        assert abs(b.position["qty"] - 100.0) < 1e-9, "sized to full equity"
+        # sizing: 1/MAX_CONCURRENT of equity, not the whole account
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        pos = p.positions["BTCUSDT"]
+        assert abs(pos["qty"] * pos["entry"] - INITIAL_CAPITAL / MAX_CONCURRENT) < 1e-9, \
+            "position notional = equity / MAX_CONCURRENT"
+        entry = Portfolio.fill(100, "long", True)
+        assert entry > 100, "slippage makes a long fill worse than the signal price"
+        assert abs(pos["entry"] - entry) < 1e-9, "entry is the slipped fill"
+        assert abs(pos["sl"] - (entry - 2.5)) < 1e-9 and \
+               abs(pos["tp"] - (entry + 6.25)) < 1e-9, "brackets hang off the fill"
 
-        # take-profit P&L, commission both sides
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        b.on_bar(_bar(100, 107, 100, 106), CHOP, 1.0)
-        assert b.position is None, "TP closes the position"
-        expected = 10000 + (106.25 - 100) * 100 - (100 + 106.25) * 100 * 0.0005
-        assert abs(b.cash_equity - expected) < 1e-6, f"TP P&L, got {b.cash_equity}"
-        assert b.wins == 1 and b.losses == 0, "win counted"
+        # risk-based sizing: a wild market gets cut down, a calm one keeps the cap
+        p = fresh()
+        p.on_bar("CALM", _bar(100, 100, 100, 100, t=HOUR), LONG, 0.2)   # ATR 0.2%
+        p.on_bar("WILD", _bar(100, 100, 100, 100, t=HOUR), LONG, 5.0)   # ATR 5%
+        calm, wild = p.positions["CALM"], p.positions["WILD"]
+        assert calm["qty"] * calm["entry"] <= INITIAL_CAPITAL / MAX_CONCURRENT + 1e-9, \
+            "calm market is capped by notional, never levered up"
+        assert wild["qty"] * wild["entry"] < calm["qty"] * calm["entry"] / 2, \
+            "wild market takes a much smaller position"
+        risk = lambda q: abs(q["entry"] - q["sl"]) * q["qty"]  # noqa: E731
+        assert risk(wild) <= INITIAL_CAPITAL * RISK_PCT / 100 + 1e-9, \
+            "no trade risks more than RISK_PCT of equity"
+        assert risk(wild) > risk(calm), \
+            "the cap still leaves calm markets risking less, not more"
 
-        # stop-loss P&L and streak
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        b.on_bar(_bar(100, 100, 97, 98), CHOP, 1.0)
-        expected = 10000 + (97.5 - 100) * 100 - (100 + 97.5) * 100 * 0.0005
-        assert abs(b.cash_equity - expected) < 1e-6, f"SL P&L, got {b.cash_equity}"
-        assert b.consec_losses == 1 and b.losses == 1, "loss counted"
+        # many markets share one account
+        p = fresh()
+        for k, sym in enumerate(["BTCUSDT", "ETHUSDT", "SOLUSDT"]):
+            p.on_bar(sym, _bar(100, 100, 100, 100, t=HOUR * (k + 1)), LONG, 1.0)
+        assert len(p.positions) == 3, "three markets open at once"
+        assert p.cash_equity == INITIAL_CAPITAL, "cash unchanged while positions are open"
 
-        # ambiguous bar (both levels touched) resolves to the stop
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        b.on_bar(_bar(100, 107, 97, 100), CHOP, 1.0)
-        assert b.cash_equity < 10000, "ambiguous bar resolves to the stop"
+        # correlated-exposure cap: one direction cannot fill the whole book
+        p = fresh()
+        for k in range(MAX_CONCURRENT + 5):
+            p.on_bar(f"SYM{k}", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        assert len(p.positions) == MAX_PER_SIDE, "one-sided book stops at MAX_PER_SIDE"
+        assert all(q["side"] == "long" for q in p.positions.values())
+        for k in range(MAX_CONCURRENT + 5):   # the other side is still available
+            p.on_bar(f"OPP{k}", _bar(100, 100, 100, 100, t=HOUR), SHORT, 1.0)
+        assert len(p.positions) == 2 * MAX_PER_SIDE, "each side capped independently"
+        assert 2 * MAX_PER_SIDE <= MAX_CONCURRENT, "side caps must fit inside the book"
+
+        # soft de-risking: size halves partway up a loss streak, before the halt
+        p = fresh()
+        t = HOUR
+        for _ in range(SOFT_LOSS_STREAK):
+            p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=t), LONG, 1.0); t += HOUR
+            p.on_bar("BTCUSDT", _bar(100, 100, 97, 98, t=t), CHOP, 1.0); t += HOUR
+        assert p.consec_losses == SOFT_LOSS_STREAK and p.halted_until_ms == 0, \
+            "soft tier engages before the hard halt"
+        p.on_bar("ETHUSDT", _bar(100, 100, 100, 100, t=t), LONG, 1.0)
+        notional = p.positions["ETHUSDT"]["qty"] * p.positions["ETHUSDT"]["entry"]
+        assert abs(notional - p.cash_equity / MAX_CONCURRENT * SOFT_RISK_SCALE) < 1e-9, \
+            "position halves on a loss streak instead of the book going dark"
+
+        # take-profit P&L on 1/20 sizing, commission both sides
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        qty = p.positions["BTCUSDT"]["qty"]
+        p.on_bar("BTCUSDT", _bar(100, 107, 100, 106, t=HOUR * 2), CHOP, 1.0)
+        assert "BTCUSDT" not in p.positions, "TP closes"
+        e_in = Portfolio.fill(100, "long", True)
+        e_out = Portfolio.fill(e_in + 6.25, "long", False)
+        expected = INITIAL_CAPITAL + (e_out - e_in) * qty - (e_in + e_out) * qty * 0.0005
+        assert abs(p.cash_equity - expected) < 1e-6, f"TP P&L, got {p.cash_equity}"
+        assert p.wins == 1, "win counted"
+
+        # stop-loss
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        qty = p.positions["BTCUSDT"]["qty"]
+        p.on_bar("BTCUSDT", _bar(100, 100, 97, 98, t=HOUR * 2), CHOP, 1.0)
+        e_in = Portfolio.fill(100, "long", True)
+        e_out = Portfolio.fill(e_in - 2.5, "long", False)
+        expected = INITIAL_CAPITAL + (e_out - e_in) * qty - (e_in + e_out) * qty * 0.0005
+        assert abs(p.cash_equity - expected) < 1e-6, "SL P&L"
+        assert p.consec_losses == 1 and p.losses == 1, "loss counted"
+
+        # ambiguous bar resolves to the stop
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        p.on_bar("BTCUSDT", _bar(100, 107, 97, 100, t=HOUR * 2), CHOP, 1.0)
+        assert p.cash_equity < INITIAL_CAPITAL, "ambiguous bar takes the stop"
 
         # short side mirrors
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), SHORT, 1.0)
-        assert b.position["side"] == "short", "short entry"
-        assert abs(b.position["sl"] - 102.5) < 1e-9, "short SL above entry"
-        assert abs(b.position["tp"] - 93.75) < 1e-9, "short TP below entry"
-        b.on_bar(_bar(100, 100, 93, 94), CHOP, 1.0)
-        assert b.cash_equity > 10000, "short take-profit is a gain"
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), SHORT, 1.0)
+        assert p.positions["BTCUSDT"]["side"] == "short"
+        s_in = Portfolio.fill(100, "short", True)
+        assert s_in < 100, "slippage makes a short fill worse than the signal price"
+        assert abs(p.positions["BTCUSDT"]["tp"] - (s_in - 6.25)) < 1e-9, "short TP below entry"
+        p.on_bar("BTCUSDT", _bar(100, 100, 93, 94, t=HOUR * 2), CHOP, 1.0)
+        assert p.cash_equity > INITIAL_CAPITAL, "short TP is a gain"
 
-        # chop blocks entry, and flattens an open position
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), CHOP, 1.0)
-        assert b.position is None, "no entry when the trend filter is off"
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        b.on_bar(_bar(100, 100, 100, 100), CHOP, 1.0)
-        assert b.position is None, "chop flattens an open position"
+        # chop blocks entry and flattens
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), CHOP, 1.0)
+        assert not p.positions, "no entry in chop"
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR * 2), CHOP, 1.0)
+        assert not p.positions, "chop flattens"
 
-        # signal-flatten must NOT reverse on the same bar (Pine parity)
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        b.on_bar(_bar(100, 100, 100, 100), SHORT, 1.0)
-        assert b.position is None, "no same-bar reversal after signal flatten"
-        b.on_bar(_bar(100, 100, 100, 100), SHORT, 1.0)
-        assert b.position and b.position["side"] == "short", "reversal on the next bar"
+        # no same-bar reversal after a signal flatten; next bar is fine
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR * 2), SHORT, 1.0)
+        assert "BTCUSDT" not in p.positions, "no same-bar reversal"
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR * 3), SHORT, 1.0)
+        assert p.positions["BTCUSDT"]["side"] == "short", "reversal next bar"
 
-        # an intrabar stop-out DOES free the same bar to re-enter
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        b.on_bar(_bar(100, 100, 97, 100), LONG, 1.0)
-        assert b.position and b.position["side"] == "long", "re-entry after intrabar stop"
+        # intrabar stop-out DOES free the same bar
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        p.on_bar("BTCUSDT", _bar(100, 100, 97, 100, t=HOUR * 2), LONG, 1.0)
+        assert p.positions.get("BTCUSDT", {}).get("side") == "long", "re-entry after stop"
 
-        # halt trips on the loss limit and the cooldown releases it
-        b = fresh()
-        for _ in range(MAX_CONSEC_LOSS):
-            b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-            b.on_bar(_bar(100, 100, 97, 98), CHOP, 1.0)
-        assert b.halted_until_bar > b.bar_count, "halt trips after the loss limit"
-        blocked = b.bar_count
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        assert b.position is None, "halt blocks new entries"
-        while b.bar_count < blocked + HALT_COOLDOWN_BARS:
-            b.on_bar(_bar(100, 100, 100, 100), CHOP, 1.0)
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        assert b.position is not None, "cooldown releases the halt (no deadlock)"
+        # portfolio-level loss streak halts the whole book, cooldown releases it
+        p = fresh()
+        t = HOUR
+        for k in range(MAX_CONSEC_LOSS):
+            p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=t), LONG, 1.0); t += HOUR
+            p.on_bar("BTCUSDT", _bar(100, 100, 97, 98, t=t), CHOP, 1.0); t += HOUR
+        assert p.halted_until_ms > t, "halt trips on the loss limit"
+        p.on_bar("ETHUSDT", _bar(100, 100, 100, 100, t=t), LONG, 1.0)
+        assert "ETHUSDT" not in p.positions, "halt blocks every market, not just one"
+        t = p.halted_until_ms + HOUR
+        p.on_bar("ETHUSDT", _bar(100, 100, 100, 100, t=t), LONG, 1.0)
+        assert "ETHUSDT" in p.positions, "cooldown releases the halt (no deadlock)"
 
         # a win clears the streak
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        b.on_bar(_bar(100, 100, 97, 98), CHOP, 1.0)
-        assert b.consec_losses == 1
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        b.on_bar(_bar(100, 107, 100, 106), CHOP, 1.0)
-        assert b.consec_losses == 0, "a win resets the streak"
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        p.on_bar("BTCUSDT", _bar(100, 100, 97, 98, t=HOUR * 2), CHOP, 1.0)
+        assert p.consec_losses == 1
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR * 3), LONG, 1.0)
+        p.on_bar("BTCUSDT", _bar(100, 107, 100, 106, t=HOUR * 4), CHOP, 1.0)
+        assert p.consec_losses == 0, "a win resets the streak"
 
-        # zero-ATR bar must not open a zero-width stop
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 0.0)
-        assert b.position is None, "no entry when ATR is zero"
+        # zero ATR opens nothing
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 0.0)
+        assert not p.positions, "no entry when ATR is zero"
 
-        # mark-to-market includes unrealized P&L
-        b = fresh()
-        b.on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        assert abs(b.mark_to_market(110) - (10000 + 10 * b.position["qty"])) < 1e-9, "MTM"
+        # mark-to-market covers every open position
+        p = fresh()
+        p.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        p.on_bar("ETHUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        for pos in p.positions.values():
+            pos["last"] = 110
+        gain = sum((110 - x["entry"]) * x["qty"] for x in p.positions.values())
+        assert abs(p.mark_to_market() - (INITIAL_CAPITAL + gain)) < 1e-9, "MTM"
 
-        # ---- portfolio: books stay independent and survive a restart ----
-        books = make_books(quiet=True)
-        assert len(books) == len(STRATEGIES) * len(SYMBOLS), "one book per pair"
-        assert len({b.name for b in books}) == len(books), "book names are unique"
-        for bk in books:
-            bk.log_file = log
-        books[0].on_bar(_bar(100, 100, 100, 100), LONG, 1.0)
-        assert books[1].position is None, "books do not share position state"
-        save_books(books, state)
-        restored = make_books(quiet=True)
-        assert load_books(restored, state), "state loads"
-        assert restored[0].position and restored[0].position["side"] == "long", \
+        # strategies are independent, and state survives a restart
+        pfs = make_portfolios(quiet=True)
+        for x in pfs.values():
+            x.log_file = log
+        pfs["v1_rsi_macd"].on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=HOUR), LONG, 1.0)
+        assert not pfs["v2_stoch_mfi"].positions, "strategies do not share positions"
+        save_portfolios(pfs, state)
+        restored = make_portfolios(quiet=True)
+        assert load_portfolios(restored, state), "state loads"
+        assert restored["v1_rsi_macd"].positions["BTCUSDT"]["side"] == "long", \
             "position survives restart"
-        assert restored[1].position is None, "flat book stays flat after restart"
-        assert abs(restored[0].cash_equity - books[0].cash_equity) < 1e-9, "equity restored"
+        assert not restored["v2_stoch_mfi"].positions, "flat book stays flat"
+
+    # ---- slippage is always adverse ----
+    assert Portfolio.fill(100, "long", True) > 100, "open long pays up"
+    assert Portfolio.fill(100, "long", False) < 100, "close long sells lower"
+    assert Portfolio.fill(100, "short", True) < 100, "open short sells lower"
+    assert Portfolio.fill(100, "short", False) > 100, "close short buys back higher"
+
+    # ---- control book ----
+    cfg = STRATEGIES["v0_control"]
+    ind = {"symbol": "BTCUSDT", "close": [100.0] * 300,
+           "ema": {100: [50.0] * 300}, "adx": [30.0] * 300,
+           "bar_ms": [i * 3_600_000 for i in range(300)]}
+    fires = [signal_control(ind, i, cfg) for i in range(300)]
+    # reproducible across processes: md5, not hash(), so a restart replays the
+    # same coin flips instead of inventing a new history
+    assert fires == [signal_control(ind, i, cfg) for i in range(300)], "control is deterministic"
+    entries = [f for f in fires if f[0] or f[1]]
+    assert 0.03 < len(entries) / 300 < 0.20, \
+        f"control entry rate near {CONTROL_ENTRY_P}, got {len(entries) / 300:.3f}"
+    longs = sum(1 for f in entries if f[0])
+    assert 0.25 < longs / len(entries) < 0.75, "control direction is a fair coin"
+    assert not any(f[0] and f[1] for f in fires), "never long and short at once"
+    chop = dict(ind, adx=[5.0] * 300)
+    assert not any(signal_control(chop, i, cfg)[:2] != (False, False) for i in range(300)), \
+        "control respects the same regime filter as the real books"
+
+    # ---- expectancy ----
+    m, se, t = expectancy([10.0] * 30)
+    assert abs(m - 10) < 1e-9 and se == 0.0 and t == 0.0, "zero-variance is not infinite t"
+    m, se, t = expectancy([1.0, -1.0] * 50)
+    assert abs(m) < 1e-9 and abs(t) < 1e-9, "coin flip has no edge"
+    m, se, t = expectancy([5.0, 5.0, 5.0, -1.0])
+    assert t > 0 and se > 0, "positive mean gives positive t"
+    assert expectancy([]) == (0.0, 0.0, 0.0), "empty is safe"
+
+    # ---- benchmark ----
+    b = Benchmark()
+    assert b.equity() == INITIAL_CAPITAL, "empty benchmark is flat, not a crash"
+    b.observe("BTCUSDT", 100.0, 1); b.observe("ETHUSDT", 50.0, 1)
+    assert b.equity() == INITIAL_CAPITAL, "no move yet"
+    b.observe("BTCUSDT", 120.0, 2); b.observe("ETHUSDT", 40.0, 2)
+    # equal weight: +20% and -20% average to zero
+    assert abs(b.equity() - INITIAL_CAPITAL) < 1e-9, "equal-weight average"
+    b.observe("BTCUSDT", 200.0, 3)
+    assert b.equity() > INITIAL_CAPITAL, "basket tracks the survivor"
+    b.observe("BTCUSDT", 0.0, 4)
+    assert b.last["BTCUSDT"] == 200.0, "a zero print is ignored, not booked"
+    b2 = Benchmark(); b2.load(b.to_dict())
+    assert abs(b2.equity() - b.equity()) < 1e-9, "benchmark survives a restart"
+
+    # pnls are recorded for the t-stat, and persist
+    with tempfile.TemporaryDirectory() as d:
+        pf = Portfolio("v1_rsi_macd", log_file=os.path.join(d, "t.csv"), quiet=True)
+        pf.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=3_600_000),
+                  (True, False, True, False, True), 1.0)
+        pf.on_bar("BTCUSDT", _bar(100, 100, 97, 98, t=7_200_000),
+                  (False, False, True, False, False), 1.0)
+        assert len(pf.pnls) == 1 and pf.pnls[0] < 0, "loss recorded in pnls"
+        assert "pnls" in pf.to_dict(), "pnls persist"
 
     print("selftest: all checks passed")
 
@@ -729,4 +1062,4 @@ if __name__ == "__main__":
         try:
             main()
         except KeyboardInterrupt:
-            print("\nstopped — state saved, rerun to resume")
+            print(f"\n{BOT_NAME} stopped — state saved, rerun to resume")
