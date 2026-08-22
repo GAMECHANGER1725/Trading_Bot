@@ -158,7 +158,7 @@ def render_chart(curves, width=840, height=260):
     parts = [f'<svg viewBox="0 0 {width} {height}" preserveAspectRatio="none" '
              f'role="img" aria-label="Equity curve by strategy">']
     parts.append('<defs>')
-    for strat, key in SERIES.items():
+    for key in dict.fromkeys(SERIES.values()):
         parts.append(
             f'<linearGradient id="g-{key}" x1="0" y1="0" x2="0" y2="1">'
             f'<stop offset="0" stop-color="var(--{key})" stop-opacity="0.22"/>'
