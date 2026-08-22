@@ -67,9 +67,10 @@ def read_trades(path=pt.LOG_FILE):
     return rows
 
 
-def read_orders(path=pt.LOG_FILE, limit=40):
+def read_orders(path=pt.LOG_FILE, limit=250):
     """Every ENTRY and EXIT, newest first. read_trades() keeps only closed
-    trades for the statistics; the order book wants both sides."""
+    trades for the statistics; the order book wants both sides. 250 rather than a
+    handful now that Orders is its own page — it is a ledger, not a preview."""
     if not os.path.exists(path):
         return []
     rows = []
@@ -365,6 +366,16 @@ h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:30px;font-weight:600;
 .meter-fill{background:var(--accent);height:100%}
 .meter-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 
+/* nav */
+.nav{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;padding:4px;box-shadow:var(--shadow);overflow-x:auto}
+.nav a{flex:1 1 auto;text-align:center;white-space:nowrap;padding:8px 16px;
+  border-radius:7px;font-size:13.5px;font-weight:500;text-decoration:none;
+  color:var(--muted);transition:background .12s,color .12s}
+.nav a:hover{background:var(--surface-2);color:var(--ink)}
+.nav a.on{background:var(--accent);color:#fff}
+.nav a.on:hover{background:var(--accent);color:#fff}
+
 /* portfolio summary */
 .summary{background:var(--surface);border:1px solid var(--line);border-radius:12px;
   box-shadow:var(--shadow);padding:22px 24px;display:flex;gap:28px;
@@ -482,6 +493,115 @@ def fmt_pct(v):
 
 def cls_for(v):
     return "pos" if v > 0 else ("neg" if v < 0 else "mut")
+
+
+
+# The chart script is a plain string, not an f-string: it is full of JavaScript
+# braces and doubling every one of them to survive .format() was the kind of
+# thing that breaks silently.
+CHART_JS = """  <script>
+  const HIST = __HIST__;
+  const sel = document.getElementById('symsel');
+  const svg = document.getElementById('bigchart');
+
+  function draw(sym) {
+    const pts = HIST[sym] || [];
+    svg.innerHTML = '';
+    if (pts.length < 3) return;
+    const W = 900, H = 320, pad = 14;
+    const lo = Math.min(...pts), hi = Math.max(...pts), span = (hi - lo) || 1;
+    const x = i => pad + (W - 2 * pad) * (i / (pts.length - 1));
+    const y = v => pad + (H - 2 * pad) * (1 - (v - lo) / span);
+    const line = pts.map((v, i) => x(i).toFixed(0) + ',' + y(v).toFixed(1)).join(' ');
+    const up = pts[pts.length - 1] >= pts[0];
+    const col = up ? 'var(--pos)' : 'var(--neg)';
+    const ns = 'http://www.w3.org/2000/svg';
+    const poly = document.createElementNS(ns, 'polygon');
+    poly.setAttribute('points', pad + ',' + (H - pad) + ' ' + line + ' ' + (W - pad) + ',' + (H - pad));
+    poly.setAttribute('fill', col); poly.setAttribute('fill-opacity', '0.10');
+    svg.appendChild(poly);
+    const pl = document.createElementNS(ns, 'polyline');
+    pl.setAttribute('points', line); pl.setAttribute('fill', 'none');
+    pl.setAttribute('stroke', col); pl.setAttribute('stroke-width', '2');
+    pl.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(pl);
+  }
+
+  // Try the real widget. If the host blocks external scripts (every artifact
+  // page does) the error handler fires and the native chart simply stays.
+  let tvReady = false;
+  function mountTV(sym) {
+    if (!tvReady) return;
+    document.getElementById('tv').innerHTML = '';
+    try {
+      new TradingView.widget({
+        container_id: 'tv', symbol: 'BINANCE:' + sym, interval: '60',
+        autosize: false, width: '100%', height: 380, theme:
+          (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+        style: '1', locale: 'en', hide_side_toolbar: true, allow_symbol_change: false,
+      });
+      document.getElementById('fallback').style.display = 'none';
+    } catch (e) { tvReady = false; }
+  }
+
+  const tag = document.createElement('script');
+  tag.src = 'https://s3.tradingview.com/tv.js';
+  tag.onload = () => { tvReady = true; mountTV(sel.value); };
+  tag.onerror = () => {
+    document.getElementById('cnote').textContent =
+      'TradingView is blocked on this host, so the chart is drawn here from the '
+      + 'same Binance hourly candles the books trade on.';
+  };
+  document.head.appendChild(tag);
+
+  sel.addEventListener('change', () => { draw(sel.value); mountTV(sel.value); });
+  draw(sel.value);
+  </script>
+"""
+
+NAV = (("index.html", "Portfolio"), ("orders.html", "Orders"),
+       ("markets.html", "Markets"), ("research.html", "Research"))
+
+
+def shell(title, active, body, meta, subtitle, script=""):
+    """Wrap sections in the common page. `active` is the nav href to highlight;
+    pass None for the single-file build, which has no other pages to link to."""
+    if active is None:
+        nav = ""
+    else:
+        nav = '<nav class="nav">' + "".join(
+            f'<a href="{href}"{" class=\'on\'" if href == active else ""}>'
+            f'{html.escape(label)}</a>' for href, label in NAV) + "</nav>"
+    return f"""<title>{html.escape(title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>{CSS}</style>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Bob</h1>
+      <p class="tagline">{subtitle}</p>
+    </div>
+    <div class="stamp">
+      {meta['pill']}
+      <span class="lbl">Updated {meta['generated']:%d %b %Y · %H:%M} UTC</span>
+    </div>
+  </header>
+  {nav}
+{body}
+  <footer>Simulated trading only &mdash; no orders are placed and no real money is
+    at risk. Each strategy runs one {fmt_money(pt.INITIAL_CAPITAL)} account across
+    {len(pt.SYMBOLS)} markets on {pt.INTERVAL} candles, risking {pt.RISK_PCT}% of
+    equity per position (capped at 1/{pt.MAX_CONCURRENT} notional, max
+    {pt.MAX_PER_SIDE} per side) behind a {pt.ATR_MULT_SL}&times; ATR stop with a
+    {pt.RR}R target. The book halts for {pt.HALT_COOLDOWN_HOURS}h after
+    {pt.MAX_CONSEC_LOSS} consecutive losses or a {pt.MAX_DD_PCT:.0f}% drawdown.</footer>
+</div>
+{script}
+"""
+
 
 
 def build_html(state, trades, live, generated, bench=None, orders=None):
@@ -739,27 +859,10 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
         f'<span><span class="swatch" style="background:var(--{SERIES[s]})"></span>'
         f'{html.escape(LABEL[s])}</span>' for s in SHOWN)
 
-    return f"""<title>Bob</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
-<style>{CSS}</style>
-<div class="wrap">
+    # ---- sections, so pages can be assembled from them ----
+    sec = {}
 
-  <header>
-    <div>
-      <h1>Bob</h1>
-      <p class="tagline">Bob runs two rule-based strategies across {len(pt.SYMBOLS)} crypto
-        markets on live prices with simulated money, against {len(CONTROLS)} random-entry
-        control books and buy-and-hold. No exchange account, no real capital. The question is not
-        which book is ahead — it is whether either beats noise.</p>
-    </div>
-    <div class="stamp">
-      {pill}
-      <span class="lbl">Updated {generated:%d %b %Y · %H:%M} UTC</span>
-    </div>
-  </header>
-
+    sec["summary"] = f"""
   <div class="summary">
     <div class="big">
       <span class="lbl">Portfolio net worth</span>
@@ -782,15 +885,17 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
         <span class="v num">{(totals['wins'] / totals['closed'] * 100) if totals['closed'] else 0:.0f}%</span>
         <span class="sub mut">{totals['wins']}W / {totals['closed'] - totals['wins']}L</span></div>
     </div>
-  </div>
+  </div>"""
 
+    sec["positions"] = f"""
   <section>
     <div class="sec-head"><h2>Open positions</h2>
       <span class="lbl">{totals['open']} held by the strategies &middot;
         {sum(len(stats[k]['positions']) for k in CONTROLS if k in stats)} more in the control books</span></div>
     <div class="sec-body"><div class="pos-grid">{"".join(pos_cards)}</div></div>
-  </section>
+  </section>"""
 
+    sec["chart"] = f"""
   <section>
     <div class="sec-head"><h2>Market chart</h2>
       <select id="symsel" aria-label="Choose a market">{chart_opts}</select></div>
@@ -801,22 +906,25 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
         <p class="chart-note" id="cnote">Drawn from the same Binance hourly candles
           the books trade on.</p></div>
     </div>
-  </section>
+  </section>"""
 
+    sec["orders"] = f"""
   <section>
     <div class="sec-head"><h2>Recent orders</h2>
-      <span class="lbl">newest first</span></div>
+      <span class="lbl">{len(orders)} shown, newest first</span></div>
     <div class="scroll"><table>
       <thead><tr><th>Time</th><th>Event</th><th>Market</th><th>Side</th>
         <th>Price</th><th>Book</th><th>Reason</th><th>P&amp;L</th></tr></thead>
       <tbody>{order_rows}</tbody></table></div>
-  </section>
+  </section>"""
 
+    sec["equity"] = f"""
   <section>
     <div class="sec-head"><h2>Equity curve</h2><div class="legend">{legend}</div></div>
     <div class="sec-body"><div class="chart">{render_chart(curves)}</div></div>
-  </section>
+  </section>"""
 
+    sec["verdict"] = f"""
   <div class="verdict">
     <div class="verdict-head"><h2>{html.escape(headline)}</h2></div>
     <p>{html.escape(body)}</p>
@@ -831,10 +939,11 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
           per strategy before returns can be told apart from luck.</span>
       </div>
     </div>
-  </div>
+  </div>"""
 
-  <div class="grid2">{"".join(cards)}</div>
+    sec["books"] = f'\n  <div class="grid2">{"".join(cards)}</div>'
 
+    sec["signals"] = f"""
   <section>
     <div class="sec-head"><h2>What each strategy sees right now</h2></div>
     <div class="scroll"><table>
@@ -843,80 +952,28 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
         {"".join(f'<th>{html.escape(LABEL[s].split(chr(183))[0].strip())}</th>' for s in SHOWN)}
       </tr></thead>
       <tbody>{"".join(sig_rows)}</tbody></table></div>
-  </section>
+  </section>"""
 
-  <script>
-  const HIST = {chart_json};
-  const sel = document.getElementById('symsel');
-  const svg = document.getElementById('bigchart');
+    sec["script"] = CHART_JS.replace("__HIST__", chart_json)
 
-  function draw(sym) {{
-    const pts = HIST[sym] || [];
-    svg.innerHTML = '';
-    if (pts.length < 3) return;
-    const W = 900, H = 320, pad = 14;
-    const lo = Math.min(...pts), hi = Math.max(...pts), span = (hi - lo) || 1;
-    const x = i => pad + (W - 2 * pad) * (i / (pts.length - 1));
-    const y = v => pad + (H - 2 * pad) * (1 - (v - lo) / span);
-    const line = pts.map((v, i) => x(i).toFixed(0) + ',' + y(v).toFixed(1)).join(' ');
-    const up = pts[pts.length - 1] >= pts[0];
-    const col = up ? 'var(--pos)' : 'var(--neg)';
-    const ns = 'http://www.w3.org/2000/svg';
-    const poly = document.createElementNS(ns, 'polygon');
-    poly.setAttribute('points', pad + ',' + (H - pad) + ' ' + line + ' ' + (W - pad) + ',' + (H - pad));
-    poly.setAttribute('fill', col); poly.setAttribute('fill-opacity', '0.10');
-    svg.appendChild(poly);
-    const pl = document.createElementNS(ns, 'polyline');
-    pl.setAttribute('points', line); pl.setAttribute('fill', 'none');
-    pl.setAttribute('stroke', col); pl.setAttribute('stroke-width', '2');
-    pl.setAttribute('stroke-linejoin', 'round');
-    svg.appendChild(pl);
-  }}
-
-  // Try the real widget. If the host blocks external scripts (every artifact
-  // page does) the error handler fires and the native chart simply stays.
-  let tvReady = false;
-  function mountTV(sym) {{
-    if (!tvReady) return;
-    document.getElementById('tv').innerHTML = '';
-    try {{
-      new TradingView.widget({{
-        container_id: 'tv', symbol: 'BINANCE:' + sym, interval: '60',
-        autosize: false, width: '100%', height: 380, theme:
-          (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
-        style: '1', locale: 'en', hide_side_toolbar: true, allow_symbol_change: false,
-      }});
-      document.getElementById('fallback').style.display = 'none';
-    }} catch (e) {{ tvReady = false; }}
-  }}
-
-  const tag = document.createElement('script');
-  tag.src = 'https://s3.tradingview.com/tv.js';
-  tag.onload = () => {{ tvReady = true; mountTV(sel.value); }};
-  tag.onerror = () => {{
-    document.getElementById('cnote').textContent =
-      'TradingView is blocked on this host, so the chart is drawn here from the '
-      + 'same Binance hourly candles the books trade on.';
-  }};
-  document.head.appendChild(tag);
-
-  sel.addEventListener('change', () => {{ draw(sel.value); mountTV(sel.value); }});
-  draw(sel.value);
-  </script>
-
-  <footer>Simulated trading only &mdash; no orders are placed and no real money is
-    at risk. Each strategy runs one {fmt_money(pt.INITIAL_CAPITAL)} account across
-    {len(pt.SYMBOLS)} markets on {pt.INTERVAL} candles, risking {pt.RISK_PCT}% of equity per
-    position (capped at 1/{pt.MAX_CONCURRENT} notional, max {pt.MAX_PER_SIDE} per
-    side) behind a {pt.ATR_MULT_SL}&times; ATR stop with a {pt.RR}R target. The book halts for {pt.HALT_COOLDOWN_HOURS}h after
-    {pt.MAX_CONSEC_LOSS} consecutive losses or a {pt.MAX_DD_PCT:.0f}% drawdown.</footer>
-</div>
-"""
+    return sec, {"pill": pill, "generated": generated}
 
 
-def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None):
-    """Render the dashboard. Pass `live` to reuse indicators already computed
-    by the trading loop instead of re-fetching every symbol."""
+SUB = {
+    "index.html": "Simulated money, live crypto prices. What the two strategies "
+                  "are holding right now and what the account is worth.",
+    "orders.html": "Every entry and exit the books have made, newest first.",
+    "markets.html": "Price charts and what each strategy currently reads in all "
+                    "{n} markets.",
+    "research.html": "Does either strategy actually beat random entry? Two "
+                     "indicator books against {c} coin-flip books and buy-and-hold.",
+}
+
+
+def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None, out_dir=None):
+    """Render the site. Writes the multi-page build into `out_dir` (default: the
+    directory of `out_file`) and a single-file build to `out_file` for hosts that
+    can only serve one page, which is what a Claude artifact is."""
     state = read_state()
     trades = read_trades()
     if bench is None:
@@ -929,13 +986,34 @@ def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None):
         bench = b.equity()
     if live is None:
         live = live_prices() if fetch_live else {}
-    page = build_html(state, trades, live, datetime.now(timezone.utc), bench=bench,
-                      orders=read_orders())
+
+    sec, meta = build_html(state, trades, live, datetime.now(timezone.utc),
+                           bench=bench, orders=read_orders())
+    out_dir = out_dir or (os.path.dirname(os.path.abspath(out_file)) or ".")
+
+    def sub(name):
+        return SUB[name].format(n=len(pt.SYMBOLS), c=len(CONTROLS))
+
+    pages = {
+        "index.html": (sec["summary"] + sec["positions"] + sec["equity"], ""),
+        "orders.html": (sec["orders"], ""),
+        "markets.html": (sec["chart"] + sec["signals"], sec["script"]),
+        "research.html": (sec["verdict"] + sec["books"], ""),
+    }
+    for name, (body, script) in pages.items():
+        with open(os.path.join(out_dir, name), "w") as f:
+            f.write(shell(f"Bob · {dict(NAV)[name]}", name, body, meta,
+                          sub(name), script))
+
+    # Single file: every section, no nav, for a one-page host.
+    one = (sec["summary"] + sec["positions"] + sec["equity"] + sec["chart"]
+           + sec["orders"] + sec["verdict"] + sec["books"] + sec["signals"])
     with open(out_file, "w") as f:
-        f.write(page)
+        f.write(shell("Bob", None, one, meta, sub("index.html"), sec["script"]))
     return out_file, len(trades), len(state)
 
 
 if __name__ == "__main__":
     path, n_trades, n_books = generate()
-    print(f"wrote {path} — {n_books} books, {n_trades} closed trades")
+    print(f"wrote {path} + {len(NAV)} pages — {n_books} books, "
+          f"{n_trades} closed trades")

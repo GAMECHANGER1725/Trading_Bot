@@ -630,10 +630,15 @@ def sync_dashboard_to_github(dashboard_path="dashboard.html"):
     try:
         if not os.path.isdir(GITHUB_SYNC_WORKTREE):
             return False
-        shutil.copy(dashboard_path, os.path.join(GITHUB_SYNC_WORKTREE, "dashboard.html"))
-        # index.html as well: Vercel (and any static host) serves the site root,
-        # and this branch is the deploy source. Same bytes, two names.
-        shutil.copy(dashboard_path, os.path.join(GITHUB_SYNC_WORKTREE, "index.html"))
+        # The site is several pages now. dashboard.html is the single-file build
+        # kept for one-page hosts (a Claude artifact); index.html and the rest
+        # are the real site.
+        src_dir = os.path.dirname(os.path.abspath(dashboard_path)) or "."
+        for name in ("dashboard.html", "index.html", "orders.html",
+                     "markets.html", "research.html"):
+            src = os.path.join(src_dir, name)
+            if os.path.exists(src):
+                shutil.copy(src, os.path.join(GITHUB_SYNC_WORKTREE, name))
         run = lambda *a: subprocess.run(  # noqa: E731
             ["git", *a], cwd=GITHUB_SYNC_WORKTREE, capture_output=True, text=True, timeout=30)
         run("add", "-A")
