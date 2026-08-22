@@ -14,8 +14,15 @@ benchmarks that matter?
   * the random-entry control  — did the signal do anything?
   * equal-weight buy-and-hold — did trading beat not trading?
 
-Run:  python3 replay.py            whole window
-      python3 replay.py --split    first half vs second half
+One random control is itself a single draw: with a 5% tail, roughly one seed in
+twenty clears |t| > 2 on nothing at all. `--controls N` therefore runs N
+independent coin-flip books and reports where each real strategy falls in that
+distribution. A strategy that lands mid-pack among random books has no edge, no
+matter what its own t-statistic says.
+
+Run:  python3 replay.py               whole window, one control
+      python3 replay.py --split       first half vs second half
+      python3 replay.py --controls 30 rank the strategies against 30 random books
 """
 import os
 import sys
@@ -89,13 +96,46 @@ def show(title, pfs, bench):
     return res
 
 
+def control_sweep(series, lo, hi, n_controls):
+    """Rank each real strategy against a population of random-entry books."""
+    base = pt.STRATEGIES["v0_control"]
+    for k in range(n_controls):
+        pt.STRATEGIES[f"ctrl{k:02d}"] = {**base, "seed": k + 1}
+    pt.STRATEGIES.pop("v0_control", None)
+    pfs, bench = run(series, lo, hi)
+
+    ctrl = sorted(pt.expectancy(p.pnls)[0]
+                  for k, p in pfs.items() if k.startswith("ctrl"))
+    lo_c, hi_c = ctrl[0], ctrl[-1]
+    med = ctrl[len(ctrl) // 2]
+    print(f"\n=== {n_controls} random-entry books ===")
+    print(f"mean P&L per trade   worst {lo_c:+.2f}   median {med:+.2f}   "
+          f"best {hi_c:+.2f}")
+    be = bench.equity()
+    print(f"buy & hold           {(be / pt.INITIAL_CAPITAL - 1) * 100:+.2f}%\n")
+
+    for name in sorted(k for k in pfs if not k.startswith("ctrl")):
+        m = pt.expectancy(pfs[name].pnls)[0]
+        beaten = sum(1 for c in ctrl if m > c)
+        pct = beaten / len(ctrl) * 100
+        # one-sided: to claim an edge a strategy should sit above essentially
+        # every random book, not merely above their average
+        verdict = ("BEATS the control population" if pct >= 95 else
+                   "inside the range of pure chance")
+        print(f"{name:14} {m:+.2f} per trade — beats {beaten}/{len(ctrl)} "
+              f"random books ({pct:.0f}th pct) — {verdict}")
+
+
 def main():
     series = load_series()
     n = max(len(c) for c, _ in series.values())
     print(f"{len(series)} markets, bars {pt.WARMUP_BARS}..{n} "
           f"({(n - pt.WARMUP_BARS) / 24:.0f} days of {pt.INTERVAL} candles)")
 
-    if "--split" in sys.argv:
+    if "--controls" in sys.argv:
+        n_controls = int(sys.argv[sys.argv.index("--controls") + 1])
+        control_sweep(series, pt.WARMUP_BARS, n, n_controls)
+    elif "--split" in sys.argv:
         # A cheap stability check, not a walk-forward validation: if a result
         # only exists in one half, it is a regime, not an edge.
         mid = (pt.WARMUP_BARS + n) // 2

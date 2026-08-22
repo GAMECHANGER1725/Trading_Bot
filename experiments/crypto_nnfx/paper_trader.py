@@ -297,8 +297,11 @@ def signal_control(ind, i, cfg):
     trending = ind["adx"][i] > cfg["adx_min"]
     if not trending:
         return False, False, bull, bear, trending
-    seed = ind["symbol"], i, ind.get("bar_ms", [0] * (i + 1))[i]
-    digest = hashlib.md5(repr(seed).encode()).digest()
+    # Seed on (symbol, candle close time) ONLY. The bar index i shifts every
+    # poll as the rolling 500-bar window slides, so including it would give the
+    # same candle a different coin flip each time it is seen.
+    seed = f"{cfg.get('seed', 0)}:{ind['symbol']}:{ind['bar_ms'][i]}"
+    digest = hashlib.md5(seed.encode()).digest()
     roll = int.from_bytes(digest[:4], "big") / 2**32          # uniform [0,1)
     if roll >= cfg["entry_p"]:
         return False, False, bull, bear, trending
@@ -309,7 +312,7 @@ def signal_control(ind, i, cfg):
 STRATEGIES = {
     "v0_control": {
         "signal": signal_control, "baseline_len": 100, "adx_min": 20,
-        "entry_p": CONTROL_ENTRY_P,
+        "entry_p": CONTROL_ENTRY_P, "seed": 0,
     },
     "v1_rsi_macd": {
         "signal": signal_v1, "baseline_len": 100, "adx_min": 20,
@@ -998,6 +1001,11 @@ def selftest():  # noqa: C901 - a flat list of asserts reads better than helpers
            "ema": {100: [50.0] * 300}, "adx": [30.0] * 300,
            "bar_ms": [i * 3_600_000 for i in range(300)]}
     fires = [signal_control(ind, i, cfg) for i in range(300)]
+    # the same candle must flip the same way after the window slides, or the
+    # control is not a fixed strategy at all
+    slid = {**ind, "bar_ms": ind["bar_ms"][10:] + [0] * 10}
+    assert [signal_control(slid, i, cfg) for i in range(290)] == fires[10:], \
+        "control depends on the candle, not on its index in the window"
     # reproducible across processes: md5, not hash(), so a restart replays the
     # same coin flips instead of inventing a new history
     assert fires == [signal_control(ind, i, cfg) for i in range(300)], "control is deterministic"

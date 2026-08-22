@@ -24,7 +24,8 @@ halt after 6 or at 15% drawdown, 24h cooldown. Commission 0.05% and slippage
     python3 paper_trader.py            # run (writes dashboard.html each poll)
     python3 paper_trader.py --report   # standings, expectancy, t
     python3 paper_trader.py --selftest # ~80 assertions
-    python3 replay.py --split          # replay all books over recent history
+    python3 replay.py --split          # replay history, first half vs second
+    python3 replay.py --controls 30    # rank strategies against 30 random books
     python3 dashboard.py               # render dashboard only
 
 ## The control book is the point
@@ -53,6 +54,24 @@ Replay over 15 days of 1h candles, 32 markets, current rules:
 | `v1_rsi_macd` | −0.02% | 35/122 | 22.3% | −0.01 | −0.01 |
 | `v2_stoch_mfi` | +0.41% | 47/127 | 27.0% | +0.23 | 0.25 |
 | **buy & hold** | **+30.79%** | | | | |
+
+### One control is not enough
+
+A single random book is itself one draw: with a 5% tail, about one seed in
+twenty clears |t| > 2 on nothing at all — and the first one tried did exactly
+that (t = 2.21). So `replay.py --controls 30` runs a **population** of random
+books and asks where the real strategies fall in it.
+
+    30 random-entry books
+    mean P&L per trade   worst -0.06   median +1.12   best +2.45
+
+    v1_rsi_macd    -0.01 per trade — beats  2/30 random books ( 7th pct)
+    v2_stoch_mfi   +0.23 per trade — beats  3/30 random books (10th pct)
+
+Both strategies sit in the **bottom 10%** of pure chance. Over this window the
+indicators are not merely failing to add value — they are selecting entries
+slightly worse than a coin flip, while paying the same commission and slippage
+to do it.
 
 Two things fall out, and neither is flattering:
 
