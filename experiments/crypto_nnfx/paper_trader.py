@@ -657,6 +657,31 @@ def sync_dashboard_to_github(dashboard_path="dashboard.html"):
         return False
 
 
+def write_render_error(exc, count, out="index.html"):
+    """Replace the site with an honest error page. Trading is unaffected; this
+    only stops the page from lying about how fresh it is."""
+    when = datetime.now(timezone.utc).strftime("%d %b %Y %H:%M UTC")
+    body = (
+        "<title>Bob — dashboard error</title>"
+        "<style>body{font:15px/1.6 -apple-system,system-ui,sans-serif;max-width:44rem;"
+        "margin:12vh auto;padding:0 1.5rem;background:#0D1418;color:#E4EBEF}"
+        "code{background:#18242B;padding:.15em .4em;border-radius:4px;font-size:13px}"
+        "h1{font-size:1.4rem;margin-bottom:.6rem}p{color:#8798A5}</style>"
+        f"<h1>The dashboard failed to render</h1>"
+        f"<p>{count} attempts in a row failed, most recently at {when}.</p>"
+        f"<p><code>{str(exc)[:300]}</code></p>"
+        "<p><strong>Bob is still trading.</strong> Only the page is broken — "
+        "positions, orders and risk limits are unaffected, and the numbers will "
+        "reappear as soon as the render is fixed. This page exists so a stale "
+        "snapshot is never mistaken for a live one.</p>")
+    try:
+        for name in (out, "dashboard.html"):
+            with open(name, "w") as f:
+                f.write(body)
+    except OSError:
+        pass
+
+
 def ensure_log(path=LOG_FILE):
     if not os.path.exists(path) or os.path.getsize(path) == 0:
         with open(path, "w", newline="") as f:
@@ -778,6 +803,7 @@ def main():
 
     first_pass = True
     last_push = 0.0
+    render_fails = 0
     while True:
         t0 = time.time()
         data = fetch_all(SYMBOLS)
@@ -832,10 +858,19 @@ def main():
             # (this silently broke rendering for 12 hours on 22 Aug).
             importlib.reload(dashboard)
             dashboard.generate(live=live, bench=bench.equity())
+            render_fails = 0
         except Exception as e:  # noqa: BLE001 - a render failure must not stop trading
             import traceback
-            print(f"dashboard render failed: {e}")
+            render_fails += 1
+            print(f"dashboard render failed ({render_fails}x): {e}")
             traceback.print_exc()
+            # A failing render leaves the last good page in place, so the site
+            # keeps serving a frozen snapshot that looks current — which is how
+            # the dashboard went unnoticed-dead for 12 hours on 22 Aug. After a
+            # few consecutive failures, say so on the page itself.
+            if render_fails >= 3:
+                write_render_error(e, render_fails)
+                sync_dashboard_to_github()   # push it, or the site keeps lying
 
         if time.time() - last_push >= GITHUB_PUSH_INTERVAL:
             if sync_dashboard_to_github():
