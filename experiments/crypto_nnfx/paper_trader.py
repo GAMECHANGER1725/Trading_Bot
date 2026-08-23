@@ -613,9 +613,15 @@ def make_portfolios(quiet=False):
     return {s: Portfolio(s, quiet=quiet) for s in STRATEGIES}
 
 
-def save_portfolios(pfs, path=STATE_FILE, bench=None):
+def save_portfolios(pfs, path=STATE_FILE, bench=None, marks=None):
     tmp = f"{path}.tmp"
     payload = {"portfolios": {k: p.to_dict() for k, p in pfs.items()}}
+    if marks:
+        # Display marks from the still-forming candle. Positions carry their own
+        # "last" from the closed candle and that is what the halt logic uses —
+        # marking risk to an unclosed bar would let a wick trip a drawdown. This
+        # is only so a reader is not looking at an hour-old price.
+        payload["marks"] = marks
     if bench is not None:
         payload["benchmark"] = bench.to_dict()
     with open(tmp, "w") as f:
@@ -715,7 +721,11 @@ def report(path=STATE_FILE):
     with open(path) as f:
         blob = json.load(f)
     saved = blob.get("portfolios", {})
+    marks = blob.get("marks", {})
     bench = Benchmark(); bench.load(blob.get("benchmark", {}))
+    for sym, px in marks.items():          # same reason: hourly closes only
+        if sym in bench.start:
+            bench.last[sym] = px
     bench_eq = bench.equity()
     bench_ret = (bench_eq / INITIAL_CAPITAL - 1) * 100
 
@@ -727,11 +737,14 @@ def report(path=STATE_FILE):
 
     def mtm(st):
         """Cash plus unrealised P&L. Cash alone reads as a flat $10,000 for a
-        book holding seven open positions, which looks like it has done nothing."""
+        book holding seven open positions, which looks like it has done nothing.
+        Marks against the live price where one is stored: a position's own
+        "last" only moves when an hourly candle closes, so without this the
+        whole report is identical for fifty-nine minutes at a time."""
         total = st["cash_equity"]
-        for q in st.get("positions", {}).values():
-            delta = ((q["last"] - q["entry"]) if q["side"] == "long"
-                     else (q["entry"] - q["last"]))
+        for sym, q in st.get("positions", {}).items():
+            px = marks.get(sym) or q["last"]
+            delta = (px - q["entry"]) if q["side"] == "long" else (q["entry"] - px)
             total += delta * q["qty"]
         return total
 
@@ -868,7 +881,8 @@ def main():
                         continue
                     p.on_bar(symbol, bar, scfg["signal"](ind, i, scfg), ind["atr"][i])
 
-        save_portfolios(pfs, bench=bench)
+        save_portfolios(pfs, bench=bench,
+                        marks={k: v["now"] for k, v in live.items() if v.get("now")})
         try:  # imported lazily: dashboard.py imports this module
             import importlib
 
@@ -1191,6 +1205,22 @@ def selftest():  # noqa: C901 - a flat list of asserts reads better than helpers
     assert fmt_t([1.0, -1.0] * MIN_T_TRADES) != "—", "enough trades and t appears"
     sample = [5.0, 5.0, 5.0, -1.0] * 5          # fmt_t rounds to 2dp
     assert abs(float(fmt_t(sample)) - expectancy(sample)[2]) < 0.005
+
+    # ---- live marks are display-only ----
+    with tempfile.TemporaryDirectory() as d:
+        sp = os.path.join(d, "s.json")
+        pf = Portfolio("v1_rsi_macd", log_file=os.path.join(d, "l.csv"), quiet=True)
+        pf.on_bar("BTCUSDT", _bar(100, 100, 100, 100, t=3_600_000),
+                  (True, False, True, False, True), 1.0)
+        entry = pf.positions["BTCUSDT"]["entry"]
+        save_portfolios({"v1_rsi_macd": pf}, sp, marks={"BTCUSDT": entry * 2})
+        blob = json.load(open(sp))
+        assert blob["marks"]["BTCUSDT"] == entry * 2, "marks are persisted"
+        # the position's own last is untouched, so the halt logic never sees it
+        assert blob["portfolios"]["v1_rsi_macd"]["positions"]["BTCUSDT"]["last"] \
+            == entry, "a display mark must not rewrite the risk-side price"
+        save_portfolios({"v1_rsi_macd": pf}, sp)
+        assert "marks" not in json.load(open(sp)), "no marks key when none given"
 
     # ---- benchmark ----
     b = Benchmark()
