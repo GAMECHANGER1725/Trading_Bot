@@ -111,29 +111,33 @@ def portfolio_totals(stats, orders_all):
 
 
 def live_prices():
-    """Last close per symbol, plus each strategy's current read. Best-effort."""
+    """Last close per symbol plus each strategy's current read. Best-effort.
+
+    Uses the parallel fetcher: this looped one symbol at a time, which was a few
+    seconds at 32 markets and over two minutes at 142.
+    """
     out = {}
-    for sym in pt.SYMBOLS:
-        try:
-            raw = pt.fetch_klines(sym)
-            bars = raw[:-1]
-            ind = pt.compute_indicators(bars)
-            i = len(bars) - 1
-            reads = {}
-            for name, cfg in pt.STRATEGIES.items():
-                long_ok, short_ok, bull, bear, trending = cfg["signal"](ind, i, cfg)
-                reads[name] = ("long" if long_ok else "short" if short_ok else
-                               "chop" if not trending else "wait")
-            out[sym] = {
-                "price": ind["close"][i], "now": raw[-1]["close"],
-                "ema": ind["ema"][100][i],
-                "rsi": ind["rsi"][i], "stoch": ind["stoch"][i], "mfi": ind["mfi"][i],
-                "adx": ind["adx"][i], "atr": ind["atr"][i], "reads": reads,
-                "hist": [round(c, 8) for c in ind["close"][-pt.CHART_BARS:]],
-                "bar_ms": bars[i]["closeTime"],
-            }
-        except Exception:  # noqa: BLE001 - dashboard renders fine without live data
-            pass
+    pt.fetch_spreads(pt.SYMBOLS)
+    data = pt.fetch_all(pt.SYMBOLS)
+    for sym, raw in data.items():
+        bars = raw[:-1]
+        if len(bars) <= pt.WARMUP_BARS:
+            continue
+        ind = pt.compute_indicators(bars, sym)
+        i = len(bars) - 1
+        reads = {}
+        for name, cfg in pt.STRATEGIES.items():
+            long_ok, short_ok, _, _, trending = cfg["signal"](ind, i, cfg)
+            reads[name] = ("long" if long_ok else "short" if short_ok else
+                           "chop" if not trending else "wait")
+        out[sym] = {
+            "price": ind["close"][i], "now": raw[-1]["close"],
+            "ema": ind["ema"][100][i], "rsi": ind["rsi"][i],
+            "stoch": ind["stoch"][i], "mfi": ind["mfi"][i],
+            "adx": ind["adx"][i], "atr": ind["atr"][i], "reads": reads,
+            "hist": [round(c, 8) for c in ind["close"][-pt.CHART_BARS:]],
+            "bar_ms": bars[i]["closeTime"],
+        }
     return out
 
 

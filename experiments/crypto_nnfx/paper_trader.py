@@ -46,12 +46,47 @@ BOT_NAME = "Bob"
 # per-trade economics; a faster clock does not.
 # Screened 22 Aug 2026: >$20M daily quote volume, spread <0.06%, no stablecoins
 # or pegged assets (they do not trend, so a trend filter on them is meaningless).
+# 142 markets rather than 32, screened 23 Aug 2026 across every USDT spot pair
+# Binance lists: >= $2M daily quote volume, quoted spread <= 0.15%, excluding
+# stablecoins and pegged assets (they do not trend, so a trend filter on them is
+# meaningless), leveraged tokens, and one symbol with non-ASCII characters that
+# cannot be put in a URL.
+#
+# More markets is the one lever that raises trade count without touching the
+# strategy or the risk model: the same rules simply get more chances to fire.
+# Dropping the timeframe would not work — commission is a fixed toll per trade
+# while the captured move scales with ATR, so a faster clock raises the
+# break-even win rate (1h +0.8pp, 15m +1.5pp, 5m +2.6pp, 1m +5.6pp above the
+# 28.6% a 2.5R setup needs unpaid) and the measured rate only clears 1h.
+#
+# A $250 position is 0.0125% of a day's volume in the thinnest of these, so
+# market impact is not the constraint. Spread is, and it is now charged per
+# market from the live order book rather than assumed flat.
 SYMBOLS = [
-    "BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "XPLUSDT", "ZECUSDT", "BNBUSDT",
-    "DOGEUSDT", "REUSDT", "SUIUSDT", "LINKUSDT", "ADAUSDT", "PUMPUSDT", "NEARUSDT",
-    "TRXUSDT", "AVAXUSDT", "UUSDT", "BCHUSDT", "TAOUSDT", "XLMUSDT", "AAVEUSDT",
-    "WLDUSDT", "LTCUSDT", "BOMEUSDT", "UNIUSDT", "TRUMPUSDT", "SPCXBUSDT",
-    "ONDOUSDT", "SNDKBUSDT", "TUTUSDT", "CRVUSDT", "NEIROUSDT",
+    "BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "ZECUSDT", "TRUMPUSDT",
+    "PYTHUSDT", "BNBUSDT", "DOGEUSDT", "SUIUSDT", "ENAUSDT", "PUMPUSDT",
+    "REUSDT", "ADAUSDT", "NEARUSDT", "LINKUSDT", "TRXUSDT", "TUTUSDT",
+    "XLMUSDT", "RLUSDUSDT", "WLDUSDT", "UNIUSDT", "LTCUSDT", "TAOUSDT",
+    "AAVEUSDT", "AVAXUSDT", "DASHUSDT", "ONDOUSDT", "POLUSDT", "UUSDT",
+    "XPLUSDT", "ACEUSDT", "ZAMAUSDT", "BCHUSDT", "PENGUUSDT", "HBARUSDT",
+    "FETUSDT", "GRAMUSDT", "ARBUSDT", "FILUSDT", "DOTUSDT", "ICPUSDT",
+    "MUBARAKUSDT", "ZENUSDT", "INJUSDT", "CRVUSDT", "ZROUSDT", "ETCUSDT",
+    "PORTALUSDT", "HEMIUSDT", "GIGGLEUSDT", "ETHFIUSDT", "VIRTUALUSDT",
+    "XAUTUSDT", "COTIUSDT", "ONGUSDT", "NEIROUSDT", "BOMEUSDT", "TRBUSDT",
+    "OPUSDT", "ORDIUSDT", "KAITOUSDT", "PAXGUSDT", "WIFUSDT", "STXUSDT",
+    "SEIUSDT", "DEXEUSDT", "GALAUSDT", "FLOKIUSDT", "RENDERUSDT", "SPCXBUSDT",
+    "GPSUSDT", "LDOUSDT", "TIAUSDT", "BIOUSDT", "PLUMEUSDT", "CRCLBUSDT",
+    "FFUSDT", "QQQBUSDT", "MORPHOUSDT", "CAKEUSDT", "PENDLEUSDT", "EIGENUSDT",
+    "ATOMUSDT", "PROMUSDT", "JSTUSDT", "JTOUSDT", "CHIPUSDT", "CFGUSDT",
+    "ALLOUSDT", "LUNCUSDT", "BROCCOLI714USDT", "SANDUSDT", "AXSUSDT",
+    "ALGOUSDT", "EULUSDT", "HMSTRUSDT", "HEIUSDT", "STRKUSDT", "SPYBUSDT",
+    "BICOUSDT", "MMTUSDT", "ONTUSDT", "SPKUSDT", "ROBOUSDT", "MSTRBUSDT",
+    "USUALUSDT", "GENIUSUSDT", "MEGAUSDT", "EPICUSDT", "AEROUSDT", "CHZUSDT",
+    "SYNUSDT", "METUSDT", "APEUSDT", "BNSOLUSDT", "SNDKBUSDT", "NILUSDT",
+    "BERAUSDT", "ARUSDT", "SKHYBUSDT", "ESPUSDT", "CVXUSDT", "FORMUSDT",
+    "KITEUSDT", "WBTCUSDT", "SKYUSDT", "SUSDT", "SUNUSDT", "NIGHTUSDT",
+    "BMTUSDT", "EDENUSDT", "WBETHUSDT", "BABYUSDT", "ZKUSDT", "SAGAUSDT",
+    "RIFUSDT", "SAHARAUSDT", "RAYUSDT", "CFXUSDT", "SOXLBUSDT", "ARKMUSDT"
 ]
 INTERVAL = "1h"
 HOSTS = ["https://data-api.binance.vision", "https://api.binance.com"]
@@ -61,7 +96,7 @@ KLINE_LIMIT = 500
 # once an hour — it only shortens the gap between a candle closing and Bob
 # noticing. The page's own prices come from the browser, not from here.
 POLL_SECONDS = 60
-FETCH_WORKERS = 8
+FETCH_WORKERS = 24   # 142 markets fetch in ~12s at this width
 LOG_FILE = "paper_trades.csv"
 STATE_FILE = "paper_state.json"
 
@@ -83,12 +118,16 @@ GITHUB_PUSH_INTERVAL = 600  # seconds; independent of the trading poll cadence
 ATR_LEN = 14
 ATR_MULT_SL = 2.5
 RR = 2.5
-MAX_CONCURRENT = 20      # positions open at once; each sized at 1/20 of equity
+MAX_CONCURRENT = 40      # positions open at once; each sized at 1/40 of equity
 # 20 crypto positions are NOT 20 independent bets: majors correlate ~0.8 with BTC,
 # so an unconstrained book is one leveraged BTC-direction bet wearing 20 hats. On
 # 22 Aug both strategies halted within the same hour, which is what that looks
 # like. Capping each side bounds the correlated exposure to ~40% of equity.
-MAX_PER_SIDE = 8
+# Raised with the market count: 8 per side across 142 markets would leave the
+# book full and refusing signals almost permanently, which is the state v2 was
+# already in at 32. Risk per position is unchanged, so the most the book can now
+# have at stake in one direction is 20 x 0.125% = 2.5% of equity.
+MAX_PER_SIDE = 20
 MAX_CONSEC_LOSS = 6      # across the whole book now, not per market
 # Halving size partway up the streak preserves sample (the scarce resource in a
 # forward test) instead of going dark the moment a regime turns.
@@ -112,7 +151,17 @@ COMMISSION_PCT = 0.05    # per side, matches backtest parity profile
 # Stops do not fill at the stop price. Crypto gaps through the level, and the 2am
 # wick that triggers half of them is exactly when the book is thinnest. Charging
 # an adverse half-tick per side makes every number below worse and true.
-SLIPPAGE_PCT = 0.02      # per side, always against us
+SLIPPAGE_PCT = 0.02      # per side, fallback when the live spread is unknown
+# Charging every market the same slippage was defensible at 32 deep pairs. Across
+# 142 it is not: the quoted spread runs from under 0.001% on BTC to 0.15% on the
+# thinnest, so one flat number simultaneously overcharges the majors and flatters
+# the tail. SPREADS holds half the live quoted spread per symbol — what a taker
+# actually gives up crossing it — refreshed each poll from one bookTicker call.
+SPREADS = {}
+MAX_SLIPPAGE_PCT = 0.25  # a quote this wide is a broken book, not a tradable one
+# A momentarily zero spread does not mean a free fill: the book moves between
+# deciding and arriving. Never charge less than this.
+MIN_SLIPPAGE_PCT = 0.005
 WARMUP_BARS = 150
 CHART_BARS = 96          # 4 days of hourly closes, enough to read a position
 
@@ -153,6 +202,33 @@ def fetch_klines(symbol, interval=INTERVAL, limit=KLINE_LIMIT, retries=3):
                 last_err = e
         time.sleep(2 ** attempt)
     raise RuntimeError(f"all hosts failed for {symbol}: {last_err}")
+
+
+def fetch_spreads(symbols):
+    """Half the quoted spread per symbol, in percent. One request covers every
+    market. Best-effort: a failure leaves SPREADS as it was and the flat
+    fallback applies."""
+    want = set(symbols)
+    for host in HOSTS:
+        try:
+            req = urllib.request.Request(f"{host}/api/v3/ticker/bookTicker",
+                                         headers={"User-Agent": "bob/3.0"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                rows = json.loads(resp.read())
+        except Exception:  # noqa: BLE001 - next host, then give up quietly
+            continue
+        out = {}
+        for r in rows:
+            if r["symbol"] not in want:
+                continue
+            bid, ask = float(r["bidPrice"]), float(r["askPrice"])
+            if bid > 0 and ask > bid:
+                out[r["symbol"]] = (ask - bid) / ((ask + bid) / 2) * 100 / 2
+        if out:
+            SPREADS.clear()
+            SPREADS.update(out)
+            return len(out)
+    return 0
 
 
 def fetch_all(symbols):
@@ -408,11 +484,14 @@ class Portfolio:
 
     # ---- accounting ----
     @staticmethod
-    def fill(price, side, entering):
+    def fill(price, side, entering, symbol=None):
         """Adverse fill. Buying (open long / close short) pays up, selling
-        receives less."""
+        receives less. Uses the live half-spread for this market when we have
+        one, so a thin altcoin is charged what it actually costs to cross."""
+        slip = SPREADS.get(symbol, SLIPPAGE_PCT) if symbol else SLIPPAGE_PCT
+        slip = min(max(slip, MIN_SLIPPAGE_PCT), MAX_SLIPPAGE_PCT)
         buying = (side == "long") == entering
-        return price * (1 + SLIPPAGE_PCT / 100 * (1 if buying else -1))
+        return price * (1 + slip / 100 * (1 if buying else -1))
 
     def mark_to_market(self):
         """Equity including unrealized P&L on every open position."""
@@ -435,7 +514,7 @@ class Portfolio:
 
     def close_position(self, symbol, exit_price, reason, bar_ms):
         p = self.positions.pop(symbol)
-        exit_price = self.fill(exit_price, p["side"], entering=False)
+        exit_price = self.fill(exit_price, p["side"], entering=False, symbol=symbol)
         gross = ((exit_price - p["entry"]) if p["side"] == "long"
                  else (p["entry"] - exit_price))
         pnl = gross * p["qty"] - (p["entry"] + exit_price) * p["qty"] * (COMMISSION_PCT / 100)
@@ -458,7 +537,7 @@ class Portfolio:
             return  # book is full
         if sum(1 for q in self.positions.values() if q["side"] == side) >= MAX_PER_SIDE:
             return  # correlated-exposure cap: these markets move together
-        price = self.fill(price, side, entering=True)
+        price = self.fill(price, side, entering=True, symbol=symbol)
         scale = SOFT_RISK_SCALE if self.consec_losses >= SOFT_LOSS_STREAK else 1.0
         # equal risk per trade, never more notional than the old flat slice
         by_risk = self.cash_equity * (RISK_PCT / 100) / stop_dist
@@ -839,6 +918,7 @@ def main():
     render_fails = 0
     while True:
         t0 = time.time()
+        fetch_spreads(SYMBOLS)
         data = fetch_all(SYMBOLS)
         live = {}
 
@@ -1151,6 +1231,23 @@ def selftest():  # noqa: C901 - a flat list of asserts reads better than helpers
         assert restored["v1_rsi_macd"].positions["BTCUSDT"]["side"] == "long", \
             "position survives restart"
         assert not restored["v2_stoch_mfi"].positions, "flat book stays flat"
+
+    # ---- per-market slippage ----
+    SPREADS.clear()
+    SPREADS.update({"THINUSDT": 0.09, "DEEPUSDT": 0.0001, "BADUSDT": 9.9})
+    thin = Portfolio.fill(100, "long", True, "THINUSDT")
+    deep = Portfolio.fill(100, "long", True, "DEEPUSDT")
+    assert thin > deep, "a wider book must cost more to cross"
+    assert abs(thin - 100 * 1.0009) < 1e-9, "thin market charged its half-spread"
+    assert abs(deep - 100 * (1 + MIN_SLIPPAGE_PCT / 100)) < 1e-9, \
+        "a near-zero spread still pays the floor, never a free fill"
+    assert abs(Portfolio.fill(100, "long", True, "BADUSDT")
+               - 100 * (1 + MAX_SLIPPAGE_PCT / 100)) < 1e-9, \
+        "a broken quote is capped, not obeyed"
+    assert abs(Portfolio.fill(100, "long", True, "UNKNOWNUSDT")
+               - 100 * (1 + SLIPPAGE_PCT / 100)) < 1e-9, \
+        "unknown symbol falls back to the flat rate"
+    SPREADS.clear()
 
     # ---- slippage is always adverse ----
     assert Portfolio.fill(100, "long", True) > 100, "open long pays up"
