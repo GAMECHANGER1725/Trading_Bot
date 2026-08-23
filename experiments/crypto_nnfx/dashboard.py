@@ -678,30 +678,37 @@ GLOSSARY = [
          "a half times what it risks — which is why Bob can win well under half "
          "his trades and still come out ahead."),
         ("Risk per trade",
-         "%s%% of the account on any single position. Equal risk everywhere, so "
+         "%(risk)s%% of the account on any single position. Equal risk everywhere, so "
          "a volatile coin takes a smaller position than a calm one for the same "
          "money at stake."),
         ("Notional",
-         "The full size of a position. Capped at 1/%s of the account so nothing "
+         "The full size of a position. Capped at 1/%(concurrent)s of the account so nothing "
          "can dominate."),
         ("Max per side",
-         "At most %s longs and %s shorts at once. Crypto markets move together, "
+         "At most %(side)s longs and %(side)s shorts at once. Crypto markets move together, "
          "so twenty longs are closer to one big bet than twenty separate ones."),
         ("Drawdown",
          "How far the account has fallen from its highest point. Bob halts at "
-         "%s%%."),
+         "%(dd)s%%."),
         ("Halt",
-         "Trading stops for %sh after %s losses in a row, or that drawdown. "
-         "Position size also halves after %s losses in a row, before the full "
+         "Trading stops for %(cooldown)sh after %(consec)s losses in a row, or that drawdown. "
+         "Position size also halves after %(soft)s losses in a row, before the full "
          "halt."),
-        ("Commission and slippage",
-         "%s%% and %s%% charged on every side of every trade. Slippage is the "
-         "gap between the price you asked for and the price you got. Both count "
-         "against Bob, so the numbers are not flattering themselves."),
+        ("Commission",
+         "%(commission)s%% charged on every side of every trade, in and out."),
+        ("Slippage and spread",
+         "The spread is the gap between the best price a buyer offers and the "
+         "best a seller asks; crossing it costs you roughly half of it. Bob "
+         "charges each market its own live half-spread rather than one flat "
+         "figure — that runs from almost nothing on Bitcoin to around 0.075%% on "
+         "the thinnest coins here. Never less than %(minslip)s%% (a momentarily zero "
+         "spread is not a free fill) and never more than %(maxslip)s%% (a quote that wide "
+         "is a broken order book, not a tradable one). It always counts against "
+         "Bob, so the numbers are not flattering themselves."),
     ]),
     ("Judging whether it works", [
         ("Buy &amp; hold",
-         "What you would have if you simply bought all 32 coins in equal "
+         "What you would have if you simply bought all %(markets)s coins in equal "
          "amounts at the start and did nothing. The honest thing to compare "
          "against: a strategy below this line lost money by being clever."),
         ("Control / random entry",
@@ -722,11 +729,11 @@ GLOSSARY = [
          "on pure chance, so 30%% is not evidence of skill."),
         ("t-statistic",
          "How confident you can be that a result is not luck. Above 2 is the "
-         "usual bar. It shows as a dash until there are at least %s closed "
+         "usual bar. It shows as a dash until there are at least %(mint)s closed "
          "trades, because on two or three it produces enormous numbers that "
          "mean nothing."),
         ("Evidence collected",
-         "Progress towards roughly %s closed trades per strategy, about where "
+         "Progress towards roughly %(target)s closed trades per strategy, about where "
          "returns start to be distinguishable from luck. Until then the "
          "standings are entertainment."),
         ("Paper trading",
@@ -735,34 +742,40 @@ GLOSSARY = [
     ]),
 ]
 
-_GLOSSARY_NUMBERS = (
-    pt.RISK_PCT, pt.MAX_CONCURRENT, pt.MAX_PER_SIDE, pt.MAX_PER_SIDE,
-    pt.MAX_DD_PCT, pt.HALT_COOLDOWN_HOURS, pt.MAX_CONSEC_LOSS,
-    pt.SOFT_LOSS_STREAK, pt.COMMISSION_PCT, pt.SLIPPAGE_PCT,
-    pt.MIN_T_TRADES, SIGNIFICANCE_TARGET,
-)
+# Named, not positional. Positional %s silently mis-ordered every value after
+# any entry that gained a placeholder -- it put the market count into the
+# slippage floor and rendered "all 0.25 coins" while the arity check still
+# passed, because the count matched and only the order was wrong.
+_GLOSSARY_VALUES = {
+    "risk": pt.RISK_PCT,
+    "concurrent": pt.MAX_CONCURRENT,
+    "side": pt.MAX_PER_SIDE,
+    "dd": pt.MAX_DD_PCT,
+    "cooldown": pt.HALT_COOLDOWN_HOURS,
+    "consec": pt.MAX_CONSEC_LOSS,
+    "soft": pt.SOFT_LOSS_STREAK,
+    "commission": pt.COMMISSION_PCT,
+    "minslip": pt.MIN_SLIPPAGE_PCT,
+    "maxslip": pt.MAX_SLIPPAGE_PCT,
+    "markets": len(pt.SYMBOLS),
+    "mint": pt.MIN_T_TRADES,
+    "target": SIGNIFICANCE_TARGET,
+}
 
 
 def render_glossary():
-    """Definitions, with every number pulled from the live config rather than
+    """Definitions, with every number taken from the live config rather than
     typed in — a glossary that drifts from the code is worse than none."""
-    nums = list(_GLOSSARY_NUMBERS)
     out = []
     for group, items in GLOSSARY:
         rows = []
         for term, text in items:
-            n = text.count("%s")
-            if n:
-                text = text % tuple(nums[:n])
-                del nums[:n]
-            text = text.replace("%%", "%")
-            rows.append('<div class="gl"><dt>' + term + "</dt><dd>" + text
-                        + "</dd></div>")
+            rows.append('<div class="gl"><dt>' + term + "</dt><dd>"
+                        + (text % _GLOSSARY_VALUES) + "</dd></div>")
         out.append('\n  <section>\n    <div class="sec-head"><h2>' + group
                    + '</h2></div>\n    <div class="sec-body">'
                    + '<dl class="glossary">' + "".join(rows)
                    + "</dl></div>\n  </section>")
-    assert not nums, "glossary placeholders and numbers are out of step"
     return "".join(out)
 
 
@@ -936,7 +949,7 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
     # The question this dashboard answers is NOT "which strategy is ahead".
     # Two books entering on indicators are compared against a third entering at
     # random with an identical risk model, and against simply holding the same
-    # 32 markets. A strategy that beats neither has demonstrated nothing,
+    # the same markets. A strategy that beats neither has demonstrated nothing,
     # whatever its return says.
     ranked = sorted(((k, v) for k, v in stats.items() if k in REAL),
                     key=lambda kv: kv[1]["avg_trade"], reverse=True)

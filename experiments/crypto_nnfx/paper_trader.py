@@ -145,7 +145,7 @@ MAX_DD_PCT = 15.0
 # notional cap, so the average position is the same size as before and only the
 # distribution across markets changes.
 RISK_PCT = 0.125
-HALT_COOLDOWN_HOURS = 24  # wall-clock, not bar count: bars arrive from 32 markets
+HALT_COOLDOWN_HOURS = 24  # wall-clock, not bar count: bars arrive from many markets
 INITIAL_CAPITAL = 10_000.0
 COMMISSION_PCT = 0.05    # per side, matches backtest parity profile
 # Stops do not fill at the stop price. Crypto gaps through the level, and the 2am
@@ -624,11 +624,11 @@ class Portfolio:
 # ============================== benchmark ==============================
 
 class Benchmark:
-    """Equal-weight buy-and-hold of the same 32 markets, started the same moment.
+    """Equal-weight buy-and-hold of the same markets, started the same moment.
 
     Without this, "+1.6%" is uninterpretable: if the basket rose 8% over the same
     window the book badly lost while looking like a winner. Equal-weight rather
-    than BTC-only because the book trades all 32 — the fair alternative to
+    than BTC-only because the book trades them all — the fair alternative to
     "trade these markets" is "hold these markets"."""
 
     def __init__(self):
@@ -865,7 +865,7 @@ def report(path=STATE_FILE):
             total += line(name, saved[name])
     print("-" * 88)
     print(f"{'buy & hold':16} ${bench_eq:>10,.2f} {bench_ret:>7.2f}%   "
-          f"(equal-weight, same 32 markets, same start)")
+          f"(equal-weight, same {len(SYMBOLS)} markets, same start)")
 
     rng = control_range(saved)
     if rng:
