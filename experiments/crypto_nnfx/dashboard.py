@@ -775,7 +775,6 @@ TICKER_JS = """
   (function () {
     const CASH = __CASH__;
     const cards = [...document.querySelectorAll('.holding[data-sym]')];
-    if (!cards.length) return;
     // Ask for the held symbols only. The unfiltered endpoint returns ~3,700
     // symbols and 150KB; every five seconds that is 100MB an hour down someone's
     // phone to read a dozen prices.
@@ -822,15 +821,41 @@ TICKER_JS = """
       }
       if (un) { un.textContent = money(unreal); klass(un, unreal); }
       if (nw) nw.textContent = money(CASH + unreal);
+      const stamp = document.getElementById('pricedat');
+      if (stamp) stamp.textContent = 'Prices ' +
+        new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit',
+                                           second: '2-digit'});
       return true;
     }
 
-    tick().then(ok => {
-      if (!ok) return;              // host blocks the fetch: keep what was rendered
-      const pill = document.querySelector('.pill');
-      if (pill) pill.lastChild.nodeValue = 'Live prices';
-      setInterval(tick, 5000);
-    });
+    // GitHub Pages serves cache-control: max-age=600, so a browser will happily
+    // show a ten-minute-old page and never ask for a newer one -- stacked on
+    // Bob's ten-minute render that is up to twenty minutes stale. Poll the page
+    // itself past the cache and reload only when the build stamp has actually
+    // moved, so nothing flickers when there is nothing new.
+    const BUILT = (document.getElementById('built') || {}).textContent || '';
+    async function checkBuild() {
+      try {
+        const r = await fetch(location.pathname + '?_=' + Date.now(),
+                              {cache: 'no-store'});
+        if (!r.ok) return;
+        const t = (await r.text()).match(/id="built"[^>]*>([^<]*)</);
+        if (t && t[1] && t[1] !== BUILT) location.reload();
+      } catch (e) { /* offline or blocked: keep showing what we have */ }
+    }
+
+    // Always on: it is the only thing that gets a new build past the cache,
+    // and it must survive a blocked price feed and an empty book alike.
+    setInterval(checkBuild, 60000);
+
+    if (cards.length) {
+      tick().then(ok => {
+        if (!ok) return;          // host blocks the fetch: keep what was rendered
+        const pill = document.querySelector('.pill');
+        if (pill) pill.lastChild.nodeValue = 'Live prices';
+        setInterval(tick, 5000);
+      });
+    }
   })();
   </script>
 """
@@ -863,7 +888,8 @@ def shell(title, active, body, meta, subtitle, script=""):
     </div>
     <div class="stamp">
       {meta['pill']}
-      <span class="lbl">Updated {meta['generated']:%d %b %Y · %H:%M} UTC</span>
+      <span class="lbl" id="built">Page built {meta['generated']:%d %b %Y · %H:%M} UTC</span>
+      <span class="lbl" id="pricedat"></span>
     </div>
   </header>
   {nav}
@@ -1275,12 +1301,13 @@ def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None, out_dir=
         return SUB[name].format(n=len(pt.SYMBOLS), c=len(CONTROLS))
 
     pages = {
-        "index.html": (sec["summary"] + sec["positions"] + sec["equity"],
-                       sec["ticker"]),
-        "orders.html": (sec["orders"], ""),
-        "markets.html": (sec["chart"] + sec["signals"], sec["script"]),
-        "research.html": (sec["verdict"] + sec["books"], ""),
-        "glossary.html": (render_glossary(), ""),
+        "index.html": (sec["summary"] + sec["positions"], sec["ticker"]),
+        "orders.html": (sec["orders"], sec["ticker"]),
+        "markets.html": (sec["chart"] + sec["signals"],
+                         sec["script"] + sec["ticker"]),
+        "research.html": (sec["verdict"] + sec["books"] + sec["equity"],
+                          sec["ticker"]),
+        "glossary.html": (render_glossary(), sec["ticker"]),
     }
     for name, (body, script) in pages.items():
         with open(os.path.join(out_dir, name), "w") as f:
@@ -1288,8 +1315,9 @@ def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None, out_dir=
                           sub(name), script))
 
     # Single file: every section, no nav, for a one-page host.
-    one = (sec["summary"] + sec["positions"] + sec["equity"] + sec["chart"]
-           + sec["orders"] + sec["verdict"] + sec["books"] + sec["signals"]
+    one = (sec["summary"] + sec["positions"] + sec["chart"]
+           + sec["orders"] + sec["verdict"] + sec["books"] + sec["equity"]
+           + sec["signals"]
            + render_glossary())
     with open(out_file, "w") as f:
         f.write(shell("Bob", None, one, meta, sub("index.html"),
