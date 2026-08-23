@@ -56,7 +56,11 @@ SYMBOLS = [
 INTERVAL = "1h"
 HOSTS = ["https://data-api.binance.vision", "https://api.binance.com"]
 KLINE_LIMIT = 500
-POLL_SECONDS = 120   # 1h bars: no need to poll faster, and 32 markets take a moment
+# A poll costs ~13s, almost all of it waiting on the network, so 60s is a ~20%
+# duty cycle and free. It does not make Bob trade sooner — a 1h candle exists
+# once an hour — it only shortens the gap between a candle closing and Bob
+# noticing. The page's own prices come from the browser, not from here.
+POLL_SECONDS = 60
 FETCH_WORKERS = 8
 LOG_FILE = "paper_trades.csv"
 STATE_FILE = "paper_state.json"

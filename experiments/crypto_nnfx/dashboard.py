@@ -762,6 +762,79 @@ def render_glossary():
     return "".join(out)
 
 
+# Live prices in the browser. Bob re-renders the page every ten minutes and a
+# GitHub Pages rebuild is capped near ten an hour, so the file itself cannot get
+# fresher than that. The browser has no such limit: one request to Binance
+# returns every symbol at once, so the page re-prices its own positions every
+# few seconds without a rebuild, without touching Bob, and at no cost.
+#
+# Blocked hosts (every artifact page) simply keep the server-rendered numbers —
+# the fetch fails, the catch fires, and the "live" tag never appears.
+TICKER_JS = """
+  <script>
+  (function () {
+    const CASH = __CASH__;
+    const cards = [...document.querySelectorAll('.holding[data-sym]')];
+    if (!cards.length) return;
+    // Ask for the held symbols only. The unfiltered endpoint returns ~3,700
+    // symbols and 150KB; every five seconds that is 100MB an hour down someone's
+    // phone to read a dozen prices.
+    const syms = [...new Set(cards.map(c => c.dataset.sym))];
+    const URL_ = 'https://data-api.binance.vision/api/v3/ticker/price?symbols='
+      + encodeURIComponent(JSON.stringify(syms));
+    const nw = document.querySelector('.js-networth');
+    const un = document.querySelector('.js-unreal');
+    const money = n => (n < 0 ? '-' : '') + '$' +
+      Math.abs(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const signed = n => (n >= 0 ? '+' : '') +
+      n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const klass = (el, n) => {
+      el.classList.remove('pos', 'neg');
+      el.classList.add(n >= 0 ? 'pos' : 'neg');
+    };
+
+    async function tick() {
+      let map;
+      try {
+        const r = await fetch(URL_);
+        if (!r.ok) throw new Error(r.status);
+        map = new Map((await r.json()).map(x => [x.symbol, parseFloat(x.price)]));
+      } catch (e) { return false; }
+
+      let unreal = 0;
+      for (const c of cards) {
+        const px = map.get(c.dataset.sym);
+        if (!px) continue;
+        const entry = parseFloat(c.dataset.entry), qty = parseFloat(c.dataset.qty);
+        const d = c.dataset.side === 'long' ? px - entry : entry - px;
+        const pnl = d * qty;
+        unreal += pnl;
+        const el = c.querySelector('.js-pnl');
+        if (el) {
+          el.firstChild.nodeValue = signed(pnl) + ' ';
+          const pct = el.querySelector('span');
+          if (pct) pct.textContent = signed(d / entry * 100) + '%';
+          klass(el, pnl);
+        }
+        const now = c.querySelector('.js-now');
+        if (now) now.textContent = 'Now ' + px.toLocaleString('en-US',
+          {minimumFractionDigits: 4, maximumFractionDigits: 4});
+      }
+      if (un) { un.textContent = money(unreal); klass(un, unreal); }
+      if (nw) nw.textContent = money(CASH + unreal);
+      return true;
+    }
+
+    tick().then(ok => {
+      if (!ok) return;              // host blocks the fetch: keep what was rendered
+      const pill = document.querySelector('.pill');
+      if (pill) pill.lastChild.nodeValue = 'Live prices';
+      setInterval(tick, 5000);
+    });
+  })();
+  </script>
+"""
+
 NAV = (("index.html", "Portfolio"), ("orders.html", "Orders"),
        ("markets.html", "Markets"), ("research.html", "Research"),
        ("glossary.html", "Glossary"))
@@ -981,13 +1054,14 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
             if pos["side"] == "short":
                 frac = 1 - frac
             pos_cards.append(f"""
-      <div class="holding">
+      <div class="holding" data-sym="{html.escape(sym)}" data-side="{pos['side']}"
+           data-entry="{pos['entry']:.10g}" data-qty="{pos['qty']:.10g}">
         <div class="pos-top">
           <div>
             <span class="sym">{html.escape(sym.replace('USDT', ''))}</span>
             <span class="tag {pos['side']}">{pos['side']}</span>
           </div>
-          <span class="num {cls_for(pnl)} pos-pnl">{pnl:+,.2f}
+          <span class="num {cls_for(pnl)} pos-pnl js-pnl">{pnl:+,.2f}
             <span class="mut" style="font-size:11px">{pct:+.2f}%</span></span>
         </div>
         <div class="pos-book">{html.escape(SHORT.get(strat, strat))}</div>
@@ -999,7 +1073,7 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
           <span><i class="k tp"></i>Target {pos['tp']:,.4f}</span>
         </div>
         <div class="pos-foot">
-          <span class="num">Now {price:,.4f}</span>
+          <span class="num js-now">Now {price:,.4f}</span>
           <a href="{tv}" target="_blank" rel="noopener">TradingView &#8599;</a>
         </div>
       </div>""")
@@ -1070,7 +1144,7 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
   <div class="summary">
     <div class="big">
       <span class="lbl">Portfolio net worth</span>
-      <span class="v num">{fmt_money(totals['net_worth'])}</span>
+      <span class="v num js-networth">{fmt_money(totals['net_worth'])}</span>
       <span class="num {cls_for(totals['net_worth'] - totals['base'])} sub">
         {fmt_money(totals['net_worth'] - totals['base'])} ({fmt_pct((totals['net_worth'] / totals['base'] - 1) * 100)})
         since {fmt_money(totals['base'])} start</span>
@@ -1080,7 +1154,7 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
         <span class="v num">{fmt_money(totals['cash'])}</span>
         <span class="sub mut">settled, not in a trade</span></div>
       <div class="tile"><span class="lbl">In open trades</span>
-        <span class="v num {cls_for(totals['unrealised'])}">{fmt_money(totals['unrealised'])}</span>
+        <span class="v num js-unreal {cls_for(totals['unrealised'])}">{fmt_money(totals['unrealised'])}</span>
         <span class="sub mut">{totals['open']} position{'' if totals['open'] == 1 else 's'} live</span></div>
       <div class="tile"><span class="lbl">Orders placed</span>
         <span class="v num">{totals['orders']}</span>
@@ -1159,6 +1233,7 @@ def build_html(state, trades, live, generated, bench=None, orders=None):
   </section>"""
 
     sec["script"] = CHART_JS.replace("__HIST__", chart_json)
+    sec["ticker"] = TICKER_JS.replace("__CASH__", f"{totals['cash']:.4f}")
 
     return sec, {"pill": pill, "generated": generated}
 
@@ -1200,7 +1275,8 @@ def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None, out_dir=
         return SUB[name].format(n=len(pt.SYMBOLS), c=len(CONTROLS))
 
     pages = {
-        "index.html": (sec["summary"] + sec["positions"] + sec["equity"], ""),
+        "index.html": (sec["summary"] + sec["positions"] + sec["equity"],
+                       sec["ticker"]),
         "orders.html": (sec["orders"], ""),
         "markets.html": (sec["chart"] + sec["signals"], sec["script"]),
         "research.html": (sec["verdict"] + sec["books"], ""),
@@ -1216,7 +1292,8 @@ def generate(out_file=OUT_FILE, live=None, fetch_live=True, bench=None, out_dir=
            + sec["orders"] + sec["verdict"] + sec["books"] + sec["signals"]
            + render_glossary())
     with open(out_file, "w") as f:
-        f.write(shell("Bob", None, one, meta, sub("index.html"), sec["script"]))
+        f.write(shell("Bob", None, one, meta, sub("index.html"),
+                      sec["script"] + sec["ticker"]))
     return out_file, len(trades), len(state)
 
 
