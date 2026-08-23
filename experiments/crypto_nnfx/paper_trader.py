@@ -744,18 +744,27 @@ def sync_dashboard_to_github(dashboard_path="dashboard.html"):
             if os.path.exists(src):
                 shutil.copy(src, os.path.join(GITHUB_SYNC_WORKTREE, name))
         run = lambda *a: subprocess.run(  # noqa: E731
-            ["git", *a], cwd=GITHUB_SYNC_WORKTREE, capture_output=True, text=True, timeout=30)
+            ["git", *a], cwd=GITHUB_SYNC_WORKTREE, capture_output=True, text=True,
+            timeout=90)   # 30s was not enough on a flaky link; a push that slow
+                          # still succeeds, and giving up left the site stale
         run("add", "-A")
         status = run("status", "--porcelain")
         if not status.stdout.strip():
             return True  # no change since last sync
         run("-c", "user.email=bob@local", "-c", "user.name=Bob",
             "commit", "--amend", "--no-edit", "-q")
-        push = run("push", "--force", "origin", GITHUB_SYNC_BRANCH)
-        if push.returncode != 0:
-            print(f"github sync push failed: {push.stderr.strip()[:200]}")
-            return False
-        return True
+        # One retry: the observed failures were transient DNS/SSH blips that
+        # cleared within seconds, and a single miss holds the site back a full
+        # push interval.
+        for attempt in (1, 2):
+            push = run("push", "--force", "origin", GITHUB_SYNC_BRANCH)
+            if push.returncode == 0:
+                return True
+            print(f"github push attempt {attempt} failed: "
+                  f"{push.stderr.strip()[:160]}")
+            if attempt == 1:
+                time.sleep(5)
+        return False
     except Exception as e:  # noqa: BLE001
         print(f"github sync failed: {e}")
         return False
